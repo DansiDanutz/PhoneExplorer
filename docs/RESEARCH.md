@@ -76,10 +76,11 @@ Why not the video path in Stage 01:
 
 Stage 01 now uses `@yume-chan/adb` and `@yume-chan/adb-scrcpy` for a **control-only**
 scrcpy session: the vendored scrcpy 3.3.3 server starts with `video=false`, and its
-control channel provides multi-touch pinch, scroll, drag and long-press while frames still
-come from the screenshot engine. This is intentionally half of the integration — the video
-path remains Stage 02 — but it closes the most important interaction gap without waiting
-for the decoder work. The session fails closed and every gesture falls back to adb.
+control channel provides two-finger pinch while frames still come from the screenshot
+engine. Single-touch gestures stay on the proven adb path; only pinch depends on scrcpy.
+This is intentionally half of the integration — the video path remains Stage 02 — but it
+closes the most important interaction gap without waiting for the decoder work. The session
+fails closed.
 
 ## iPhone: no public screen-capture API
 

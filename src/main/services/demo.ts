@@ -21,7 +21,8 @@ type Screen =
   | { kind: 'home' }
   | { kind: 'store' }
   | { kind: 'detail'; appId: string }
-  | { kind: 'app'; appId: string };
+  | { kind: 'app'; appId: string }
+  | { kind: 'system'; name: string };
 
 interface DemoInstall {
   appId: string;
@@ -59,6 +60,24 @@ const SYSTEM_TILES: SystemTile[] = [
   { name: 'Calendar', color: '#e5484d', ink: '#ffffff', mark: 'calendar' },
   { name: 'Settings', color: '#3b3f46', ink: '#e5e7eb', mark: 'gear' },
 ];
+
+interface DockApp {
+  name: string;
+  color: string;
+  ink: string;
+  mark: MarkName;
+}
+
+const DOCK_APPS: DockApp[] = [
+  { name: 'Phone', color: '#2fbf5b', ink: '#ffffff', mark: 'phone' },
+  { name: 'Messages', color: '#2fbf5b', ink: '#ffffff', mark: 'chat' },
+  { name: 'Browser', color: '#3478f6', ink: '#ffffff', mark: 'compass' },
+  { name: 'Music', color: '#e5484d', ink: '#ffffff', mark: 'music' },
+];
+
+const BUILTIN_APPS = new Map<string, SystemTile | DockApp>(
+  [...SYSTEM_TILES, ...DOCK_APPS].map((app) => [app.name, app]),
+);
 
 function esc(value: string): string {
   return value
@@ -255,28 +274,24 @@ function renderHome(
     } else {
       const tile = slot.tile;
       parts.push(systemTile(tile, x, y, size));
+      hot({ x, y, w: size, h: size, label: `Open ${tile.name}`, action: 'system', value: tile.name });
       parts.push(text(x + size / 2, y + size + 17, 11.5, 500, '#fff', tile.name, 'text-anchor="middle"'));
     }
   });
 
-  const dockApps: Array<{ label: string; mark: MarkName; bg: string; ink: string }> = [
-    { label: 'Phone', mark: 'phone', bg: 'rgba(255,255,255,.16)', ink: '#fff' },
-    { label: 'Messages', mark: 'chat', bg: 'rgba(255,255,255,.16)', ink: '#fff' },
-    { label: 'Browser', mark: 'compass', bg: 'rgba(255,255,255,.16)', ink: '#fff' },
-    { label: 'Music', mark: 'music', bg: 'rgba(255,255,255,.16)', ink: '#fff' },
-  ];
   const dockParts: string[] = [
     rr(18, 714, 366, 102, 34, platform === 'ios' ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.07)'),
     `<rect x="18.5" y="714.5" width="365" height="101" rx="33.5" fill="none" stroke="rgba(255,255,255,.14)"/>`,
   ];
-  dockApps.forEach((item, i) => {
+  DOCK_APPS.forEach((item, i) => {
     const x = 43 + i * 82;
     const y = 728;
-    dockParts.push(rr(x, y, 54, 54, 15, item.bg));
+    dockParts.push(rr(x, y, 54, 54, 15, item.color));
     dockParts.push(
       `<g transform="translate(${x + 14}, ${y + 14})">${markToSvg(item.mark, { color: item.ink, size: 26 })}</g>`,
     );
-    dockParts.push(text(x + 27, y + 71, 9.5, 500, 'rgba(255,255,255,.72)', item.label, 'text-anchor="middle"'));
+    dockParts.push(text(x + 27, y + 71, 9.5, 500, 'rgba(255,255,255,.72)', item.name, 'text-anchor="middle"'));
+    hot({ x, y, w: 54, h: 54, label: `Open ${item.name}`, action: 'system', value: item.name });
   });
 
   const search =
@@ -316,6 +331,8 @@ function renderHome(
     ${[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => `<rect x="317" y="466" width="2" height="7" rx="1" fill="rgba(255,212,120,.75)" transform="rotate(${deg} 318 500)"/>`).join('')}
     ${text(50, 578, 9.5, 500, 'rgba(255,255,255,.45)', 'Next up  ·  Design review at 10:30')}
   </g>`;
+  hot({ x: 30, y: 442, w: 342, h: 150, label: 'Open Weather widget', action: 'system', value: 'Weather' });
+  hot({ x: 31, y: 632, w: 340, h: 40, label: 'Search apps', action: 'store' });
   return `<g>${wallpaper}
     ${text(32, 100, 10.5, 650, 'rgba(255,255,255,.82)', dateLabel, 'letter-spacing=".2"')}
     ${text(32, 116, 9, 500, 'rgba(255,255,255,.48)', '24°  ·  Clear skies')}
@@ -323,6 +340,192 @@ function renderHome(
     ${search}${parts.join('')}${dockParts.join('')}
     ${rr(188, 696, 6, 6, 3, 'rgba(255,255,255,.86)')}${rr(202, 696, 6, 6, 3, 'rgba(255,255,255,.28)')}
     ${statusBar(platform, dark, time, battery)}${homeIndicator(false)}
+  </g>`;
+}
+
+// ---------------------------------------------------------------------------
+// Built-in system / dock apps
+// ---------------------------------------------------------------------------
+
+function builtinInfo(
+  name: string,
+  time: string,
+): { headline: string; caption: string; rows: string[][] } {
+  const date = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+  switch (name) {
+    case 'Camera':
+      return {
+        headline: '24 MP',
+        caption: 'Photo · Video · Portrait',
+        rows: [
+          ['Mode', 'Photo'],
+          ['Resolution', '24 MP'],
+          ['Storage', '128 GB'],
+        ],
+      };
+    case 'Photos':
+      return {
+        headline: '1,284',
+        caption: 'Photos · 32 videos',
+        rows: [
+          ['Photos', '1,284'],
+          ['Videos', '32'],
+          ['Albums', '14'],
+        ],
+      };
+    case 'Clock':
+      return {
+        headline: time,
+        caption: `Lisbon · ${date}`,
+        rows: [
+          ['Alarm', '07:30'],
+          ['World clock', '3 cities'],
+          ['Timer', '00:00'],
+        ],
+      };
+    case 'Weather':
+      return {
+        headline: '24°',
+        caption: 'Clear skies · Lisbon',
+        rows: [
+          ['Feels like', '25°'],
+          ['Wind', '12 km/h'],
+          ['Humidity', '58%'],
+        ],
+      };
+    case 'Calendar':
+      return {
+        headline: String(new Date().getDate()),
+        caption: date,
+        rows: [
+          ['Next', 'Design review 10:30'],
+          ['Later', 'Focus time 14:00'],
+          ['Tomorrow', '2 events'],
+        ],
+      };
+    case 'Settings':
+      return {
+        headline: 'Control center',
+        caption: 'Wi-Fi · Bluetooth · Display',
+        rows: [
+          ['Wi-Fi', 'Home'],
+          ['Bluetooth', 'On'],
+          ['Display', 'Auto'],
+        ],
+      };
+    case 'Phone':
+      return {
+        headline: 'Keypad',
+        caption: 'Recents · Contacts · Voicemail',
+        rows: [
+          ['Missed', '3'],
+          ['Contacts', '42'],
+          ['Voicemail', '1'],
+        ],
+      };
+    case 'Messages':
+      return {
+        headline: '2 unread',
+        caption: 'Design team · Maya · Lumen',
+        rows: [
+          ['Pinned', 'Design team'],
+          ['Recent', 'Maya · 09:41'],
+          ['Recent', 'Lumen · 09:12'],
+        ],
+      };
+    case 'Browser':
+      return {
+        headline: 'Start page',
+        caption: 'Bookmarks · Tabs · Reading list',
+        rows: [
+          ['Bookmarks', '12'],
+          ['Tabs', '3'],
+          ['Reading list', '4'],
+        ],
+      };
+    case 'Music':
+      return {
+        headline: 'Night Drive',
+        caption: 'Lumen · Recently played',
+        rows: [
+          ['Playing', 'Night Drive'],
+          ['Artist', 'Lumen'],
+          ['Queue', '12 tracks'],
+        ],
+      };
+    default:
+      return {
+        headline: name,
+        caption: 'Built-in demo app',
+        rows: [
+          ['Status', 'Ready'],
+          ['Mode', 'Simulated'],
+          ['Back', 'Return home'],
+        ],
+      };
+  }
+}
+
+function renderBuiltinApp(
+  name: string,
+  platform: PhonePlatform,
+  hot: (h: Omit<Hotspot, 'label'> & { label: string }) => void,
+  time: string,
+  battery: number,
+): string {
+  const app = BUILTIN_APPS.get(name) ?? {
+    name,
+    color: '#4b5563',
+    ink: '#ffffff',
+    mark: 'grid' as MarkName,
+  };
+  const info = builtinInfo(name, time);
+  const iconSize = 92;
+  const iconX = 201 - iconSize / 2;
+  const iconY = 112;
+  const glyph = 58;
+  const cardY = 396;
+  const rows = info.rows
+    .map(([label, value], index) => {
+      const y = cardY + 54 + index * 58;
+      return `<g>
+        ${mono(52, y, 8, 'rgba(255,255,255,.45)', label.toUpperCase(), 'letter-spacing="1.1"')}
+        ${text(52, y + 21, 13, 500, '#ffffff', value)}
+        ${index < info.rows.length - 1 ? `<path d="M52 ${y + 36}h298" stroke="rgba(255,255,255,.08)"/>` : ''}
+      </g>`;
+    })
+    .join('');
+
+  return `<g>
+    <rect width="402" height="874" fill="#080b10"/>
+    <circle cx="338" cy="70" r="190" fill="${app.color}" opacity=".16"/>
+    <circle cx="18" cy="780" r="210" fill="${app.color}" opacity=".08"/>
+    ${statusBar(platform, false, time, battery)}
+    ${rr(22, 56, 96, 32, 16, 'rgba(255,255,255,.09)')}
+    <path d="M40 67.5 31 76l9 8.5" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    ${text(52, 80, 10, 600, '#ffffff', 'Home')}
+    ${hot({ x: 22, y: 56, w: 96, h: 32, label: 'Back', action: 'back' })}
+
+    ${rr(iconX, iconY + 5, iconSize, iconSize, 24, '#000000', 'opacity=".28"')}
+    ${rr(iconX, iconY, iconSize, iconSize, 24, app.color)}
+    <rect x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}" rx="24" fill="url(#tileSheen)"/>
+    <g transform="translate(${201 - glyph / 2}, ${iconY + (iconSize - glyph) / 2})">${markToSvg(app.mark, { color: app.ink, size: glyph })}</g>
+
+    ${text(201, 246, 26, 650, '#ffffff', app.name, 'text-anchor="middle"')}
+    ${text(201, 266, 10, 500, 'rgba(255,255,255,.5)', 'BUILT-IN DEMO APP', 'text-anchor="middle" letter-spacing="1.6"')}
+    ${text(201, 330, 40, 300, '#ffffff', info.headline, 'text-anchor="middle" letter-spacing="-1.2"')}
+    ${text(201, 354, 11, 500, 'rgba(255,255,255,.58)', info.caption, 'text-anchor="middle"')}
+
+    ${rr(30, cardY, 342, 238, 22, 'rgba(255,255,255,.055)')}
+    <rect x="30.5" y="${cardY + 0.5}" width="341" height="237" rx="21.5" fill="none" stroke="rgba(255,255,255,.1)"/>
+    ${rows}
+
+    ${text(201, 680, 9.5, 500, 'rgba(255,255,255,.38)', 'Simulated system app · tap Home to go back', 'text-anchor="middle"')}
+    ${homeIndicator(false)}
   </g>`;
 }
 
@@ -1377,6 +1580,8 @@ export class DemoDevice {
     } else if (screen.kind === 'detail') {
       const app = CATALOG_BY_ID[screen.appId];
       body = renderDetail(app, this.platform, this.installed, this.install, hot, time, this.battery);
+    } else if (screen.kind === 'system') {
+      body = renderBuiltinApp(screen.name, this.platform, hot, time, this.battery);
     } else {
       const app = CATALOG_BY_ID[screen.appId];
       const scene = SCENES[app.scene];
@@ -1455,6 +1660,10 @@ export class DemoDevice {
         return hit.value ? this.startInstall(hit.value) : false;
       case 'open':
         return hit.value ? this.openApp(hit.value) : false;
+      case 'system':
+        if (!hit.value || !BUILTIN_APPS.has(hit.value)) return false;
+        this.stack.push({ kind: 'system', name: hit.value });
+        return true;
       default:
         return false;
     }

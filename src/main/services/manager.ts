@@ -1061,7 +1061,7 @@ export class DeviceManager {
         this.log(
           'success',
           'Multi-touch control ready',
-          'scrcpy 3.3.3 · pinch, scroll, drag and long-press enabled',
+          'scrcpy 3.3.3 · two-finger pinch enabled; single touch stays on adb',
         );
       })
       .catch((error) => {
@@ -1145,21 +1145,19 @@ export class DeviceManager {
       return;
     }
     const point = this.toDevicePoint(nx, ny);
-    const size = this.gestureSize(device);
     try {
       if (device.isDemo) {
         const demo = this.activeDemo;
         if (demo?.tap(point.x, point.y)) this.sendDemoFrame(true);
       } else if (device.platform === 'android') {
-        if (this.androidControl?.ready) {
-          await this.androidControl.tap(point.x, point.y, size.width, size.height);
-        } else {
-          await this.adb.tap(device.serial, point.x, point.y);
-        }
+        // Single touch stays on adb: it is the proven path on every device.
+        // scrcpy is reserved for the gestures adb cannot express (pinch).
+        await this.adb.tap(device.serial, point.x, point.y);
       } else {
         await this.ios.tap(device.serial, point.x, point.y);
       }
     } catch (error) {
+      this.log('error', 'Tap failed', messageOf(error));
       this.toast('error', 'Tap failed', messageOf(error));
     }
   }
@@ -1176,16 +1174,14 @@ export class DeviceManager {
       return;
     }
     const point = this.toDevicePoint(nx, ny);
-    const size = this.gestureSize(device);
     try {
-      if (device.platform === 'android' && this.androidControl?.ready) {
-        await this.androidControl.longPress(point.x, point.y, size.width, size.height, durationMs);
-      } else if (device.platform === 'android') {
+      if (device.platform === 'android') {
         await this.adb.swipe(device.serial, point.x, point.y, point.x, point.y, durationMs);
       } else {
         await this.ios.swipe(device.serial, point.x, point.y, point.x, point.y, durationMs);
       }
     } catch (error) {
+      this.log('error', 'Long press failed', messageOf(error));
       this.toast('error', 'Long press failed', messageOf(error));
     }
   }
@@ -1201,21 +1197,9 @@ export class DeviceManager {
       );
       return;
     }
-    const androidSize = this.gestureSize(device);
     const size = this.inputSize(device);
     const point = this.toDevicePoint(nx, ny);
     try {
-      if (device.platform === 'android' && this.androidControl?.ready) {
-        await this.androidControl.scroll(
-          point.x,
-          point.y,
-          deltaX,
-          deltaY,
-          androidSize.width,
-          androidSize.height,
-        );
-        return;
-      }
       const distance = clamp(Math.max(Math.abs(deltaX), Math.abs(deltaY)) * 0.8, 50, 420);
       let x1 = point.x;
       let y1 = point.y;
@@ -1236,6 +1220,7 @@ export class DeviceManager {
         await this.ios.swipe(device.serial, x1, y1, x2, y2, 180);
       }
     } catch (error) {
+      this.log('error', 'Scroll failed', messageOf(error));
       this.toast('error', 'Scroll failed', messageOf(error));
     }
   }
@@ -1278,6 +1263,7 @@ export class DeviceManager {
         size.height,
       );
     } catch (error) {
+      this.log('error', 'Pinch failed', messageOf(error));
       this.toast('error', 'Pinch failed', messageOf(error));
     }
   }
@@ -1293,28 +1279,16 @@ export class DeviceManager {
     if (!device || !device.capabilities.input) return;
     const start = this.toDevicePoint(x1, y1);
     const end = this.toDevicePoint(x2, y2);
-    const size = this.gestureSize(device);
     try {
       if (device.isDemo) {
         this.log('info', 'Swipe simulated', 'Demo content has no scroll physics yet.');
       } else if (device.platform === 'android') {
-        if (this.androidControl?.ready) {
-          await this.androidControl.swipe(
-            [
-              { x: start.x, y: start.y },
-              { x: end.x, y: end.y },
-            ],
-            size.width,
-            size.height,
-            durationMs,
-          );
-        } else {
-          await this.adb.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
-        }
+        await this.adb.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
       } else {
         await this.ios.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
       }
     } catch (error) {
+      this.log('error', 'Swipe failed', messageOf(error));
       this.toast('error', 'Swipe failed', messageOf(error));
     }
   }

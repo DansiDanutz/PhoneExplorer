@@ -65,6 +65,7 @@ function createWindow(): BrowserWindow {
     show: false,
     backgroundColor: '#08090b',
     title: 'PhoneExplorer',
+    acceptFirstMouse: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 18, y: 18 },
     roundedCorners: true,

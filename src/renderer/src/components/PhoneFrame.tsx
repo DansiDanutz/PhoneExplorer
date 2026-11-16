@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type PointerEvent, type ReactElement } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactElement,
+} from 'react';
 import type { DeviceInfo, FramePayload, KeyAction } from '@shared/types';
 import { shade } from '../lib/format';
 import { Icon } from '../lib/icons';
@@ -82,6 +89,8 @@ export function PhoneFrame({
   const callbacksRef = useRef({ onScroll, onPinch, onLongPress, onPress });
   const longTimer = useRef<number | null>(null);
   const longFired = useRef(false);
+  const lastInputAt = useRef(0);
+  const movedDuringPress = useRef(false);
   const scrollAccum = useRef({
     x: 0,
     y: 0,
@@ -170,11 +179,13 @@ export function PhoneFrame({
     if (!p) return;
     startRef.current = { x: p.x, y: p.y, nx: p.nx, ny: p.ny };
     longFired.current = false;
+    movedDuringPress.current = false;
     clearLongPress();
     longTimer.current = window.setTimeout(() => {
       const start = startRef.current;
       if (!start) return;
       longFired.current = true;
+      lastInputAt.current = Date.now();
       setRipple({ x: start.x, y: start.y, id: Date.now() });
       window.setTimeout(() => setRipple(null), 620);
       callbacksRef.current.onLongPress(start.nx, start.ny);
@@ -189,6 +200,7 @@ export function PhoneFrame({
     const p = point(event.clientX, event.clientY);
     if (!p) return;
     if (Math.hypot(p.x - start.x, p.y - start.y) > 10) clearLongPress();
+    if (Math.hypot(p.x - start.x, p.y - start.y) > 22) movedDuringPress.current = true;
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>): void => {
@@ -199,12 +211,14 @@ export function PhoneFrame({
     if (!start) return;
     if (longFired.current) {
       longFired.current = false;
+      lastInputAt.current = Date.now();
       return;
     }
     const p = point(event.clientX, event.clientY);
     if (!p) return;
     const dx = p.x - start.x;
     const dy = p.y - start.y;
+    lastInputAt.current = Date.now();
     if (Math.hypot(dx, dy) > 22) {
       onSwipe(start.nx, start.ny, p.nx, p.ny);
     } else {
@@ -212,6 +226,25 @@ export function PhoneFrame({
       window.setTimeout(() => setRipple(null), 620);
       onTap(p.nx, p.ny);
     }
+  };
+
+  // Safety net: if a pointerup is lost (window focus changes, a child is
+  // replaced mid-press), the click still reaches the phone. Normal pointerups
+  // stamp lastInputAt so this does not double-fire.
+  const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    if (longFired.current) {
+      longFired.current = false;
+      return;
+    }
+    if (movedDuringPress.current) return;
+    if (Date.now() - lastInputAt.current < 450) return;
+    const p = point(event.clientX, event.clientY);
+    if (!p) return;
+    lastInputAt.current = Date.now();
+    setRipple({ x: p.x, y: p.y, id: Date.now() });
+    window.setTimeout(() => setRipple(null), 620);
+    onTap(p.nx, p.ny);
   };
 
   const handlePointerCancel = (): void => {
@@ -261,6 +294,7 @@ export function PhoneFrame({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
+            onClick={handleClick}
             onContextMenu={(event) => {
               event.preventDefault();
               callbacksRef.current.onPress('back');

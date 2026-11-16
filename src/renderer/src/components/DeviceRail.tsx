@@ -235,7 +235,7 @@ export function DeviceRail({
                   {active.isDemo
                     ? 'Demo'
                     : active.controlEngine === 'scrcpy'
-                      ? 'Scrcpy · multi-touch'
+                      ? 'Scrcpy · pinch'
                       : active.controlEngine === 'idb'
                         ? 'idb · touch'
                         : active.capabilities.input

@@ -108,6 +108,13 @@ try {
   if (!phone) throw new Error('phone screen has no box');
   const cx = phone.x + phone.width / 2;
   const cy = phone.y + phone.height / 2;
+  await page.mouse.click(cx, cy);
+  await page.waitForTimeout(350);
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 60, cy - 80, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(350);
   await page.mouse.move(cx, cy);
   await page.mouse.wheel(0, 240);
   await page.waitForTimeout(350);
@@ -144,11 +151,21 @@ try {
     'shell am start -a android.intent.action.VIEW -d market://details?id=com.spotify.music',
     'shell monkey -p com.spotify.music -c android.intent.category.LAUNCHER 1',
     'shell am start -a android.intent.action.VIEW -d market://search?q=Notion',
+    'shell input tap 540 1200',
+    'shell input swipe 540 1200',
   ];
   for (const needle of required) {
     if (!calls.some((call) => call.includes(needle))) {
       throw new Error(`missing adb call: ${needle}\n\n${calls.join('\n')}`);
     }
+  }
+  const taps = calls.filter((call) => call.includes('shell input tap 540 1200'));
+  if (taps.length !== 1) {
+    throw new Error(`click fired ${taps.length} taps instead of 1\n${calls.join('\n')}`);
+  }
+  const drag = calls.find((call) => call.includes('shell input swipe 540 1200'));
+  if (!drag || /input swipe 540 1200 540 1200 /.test(drag)) {
+    throw new Error(`drag did not reach adb\n${calls.join('\n')}`);
   }
   if (!calls.some((call) => call.includes('shell input swipe') && call.endsWith(' 180'))) {
     throw new Error(`scroll did not reach adb\n${calls.join('\n')}`);

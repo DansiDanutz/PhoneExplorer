@@ -42,6 +42,21 @@ try {
   const back = await page.locator('.phone-image').getAttribute('src');
   if (back === store) throw new Error('right-click did not send Back');
 
+  // Every home tile is a real hit target, not just artwork.
+  await page.locator('.hotspot[aria-label="Open Camera"]').click();
+  await page.waitForTimeout(600);
+  const camera = await page.locator('.phone-image').getAttribute('src');
+  if (camera === back) throw new Error('Camera tile did not open');
+  if ((await page.locator('.hotspot[aria-label="Back"]').count()) !== 1) {
+    throw new Error('Camera screen has no Back hotspot');
+  }
+  await page.screenshot({ path: join(shots, '32-camera.png') });
+  await page.locator('.hotspot[aria-label="Back"]').click();
+  await page.waitForTimeout(600);
+  if ((await page.locator('.phone-image').getAttribute('src')) !== back) {
+    throw new Error('Camera Back did not return home');
+  }
+
   // Scroll / pinch / long-press explain that demo screens are static.
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(0, 200);

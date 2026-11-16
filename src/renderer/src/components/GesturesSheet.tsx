@@ -94,12 +94,12 @@ export function GesturesSheet({ state, onClose }: GesturesSheetProps): ReactElem
           </strong>
           <span>
             {multiTouch
-              ? 'scrcpy control channel · pinch, scroll and native long-press enabled.'
+              ? 'scrcpy control channel · two-finger pinch enabled. Tap, drag, scroll and long-press use adb.'
               : device?.isDemo
                 ? 'Use a real Android phone for scroll and pinch; tap, drag and Back work here.'
                 : device?.platform === 'ios'
                   ? 'The iPhone bridge injects single touch. Pinch needs a WebDriverAgent session.'
-                  : 'Android multi-touch starts automatically through scrcpy. Check Activity if it stays unavailable.'}
+                  : 'Android pinch starts automatically through scrcpy. Tap, drag, scroll and long-press use adb.'}
           </span>
         </div>
       </div>

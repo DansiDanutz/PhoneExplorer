@@ -133,21 +133,21 @@ The renderer is an input surface, not just a video view:
 
 | Gesture | Renderer event | Android | iPhone |
 | --- | --- | --- | --- |
-| Tap | pointer down/up | scrcpy control or `adb input tap` | `idb ui tap` |
-| Drag / swipe | pointer drag | scrcpy multi-point or `adb input swipe` | `idb ui swipe` |
-| Scroll | wheel | scrcpy `injectScroll`, else directional swipe | directional swipe |
-| Long press | 620 ms hold | scrcpy down/wait/up, else same-point swipe | same-point swipe |
+| Tap | pointer down/up | `adb input tap` | `idb ui tap` |
+| Drag / swipe | pointer drag | `adb input swipe` | `idb ui swipe` |
+| Scroll | wheel | directional `adb input swipe` | directional swipe |
+| Long press | 620 ms hold | same-point `adb input swipe` | same-point swipe |
 | Pinch | Ctrl/⌘+wheel or buttons | scrcpy two-pointer gesture | not available (single touch) |
 | Back | right-click | `adb keyevent 4` | left-edge system gesture |
 | Home | middle-click / button | `adb keyevent 3` | bottom-edge system gesture |
 
 The `ScrcpyControl` service keeps a **control-only** scrcpy session for the active Android
 device. It pushes the vendored `scrcpy-server` (3.3.3) to `/data/local/tmp`, starts it with
-`video=false audio=false control=true`, and writes touch/scroll messages through
+`video=false audio=false control=true`, and writes two-finger touch messages through
 `ScrcpyControlMessageWriter`. Video still comes from the screenshot engine. The session
-starts in the background when an Android device is selected; until it is ready (or if it
-fails) gestures use the adb fallbacks. The control engine is shown in the stage footer and
-the connection card.
+starts in the background when an Android device is selected and is used **only for pinch**;
+tap, drag, scroll and long-press always use adb, so a slow or failed scrcpy start can never
+break normal clicking. The control engine is shown in the stage footer and connection card.
 
 The pinch sequence uses two pointer IDs. The first `ACTION_DOWN` creates the primary
 pointer; the second is sent as `ACTION_DOWN` too because scrcpy converts it to
@@ -190,7 +190,9 @@ pretends to have installed something it did not.
 - **State**: installed ids, current screen, active install, query, battery, boot time.
 - **Hotspots**: every tappable region is emitted with the frame. The renderer overlays
   invisible, accessible buttons with labels ("Install Spotify", "Open Google Play"). This
-  gives real hit targets and keyboard focus without image-map math.
+  gives real hit targets and keyboard focus without image-map math. Every visible home
+  tile, dock icon, search bar and the weather widget is a hotspot; system and dock apps
+  open a built-in demo screen with a Back control.
 - **Assets**: original monogram paths shared by React and the SVG renderer; no external
   images, no third-party logos, no network.
 - **Apps**: 14 catalog entries with a `scene` (music, social, chat, video, maps, learning,

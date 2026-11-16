@@ -66,7 +66,13 @@ Pixel/Galaxy/OnePlus/Xiaomi/Nothing and iPhone profiles, add a custom phone with
 resolution and frame colour, and choose a default Android and a default iPhone. The
 selection is persisted and used whenever the demo lab starts.
 
-![Phone models sheet with built-in and custom profiles](docs/screenshots/models.png)
+Every visible home tile, dock icon and the search bar is a hit target. Camera, Photos,
+Clock, Weather, Calendar, Settings, Phone, Messages, Browser and Music open a built-in
+demo screen with a Back button instead of being dead artwork.
+
+| Phone models | Built-in app |
+| --- | --- |
+| ![Phone models sheet with built-in and custom profiles](docs/screenshots/models.png) | ![Camera built-in demo app](docs/screenshots/builtin-app.png) |
 
 | | |
 | --- | --- |
@@ -143,9 +149,9 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **Activity** is a timestamped log of every bridge command, launch and install event.
 - **Click the mirror** to tap; **drag** to swipe. **Wheel** scrolls, **hold** long-presses,
   **right-click** is Back and **middle-click** is Home.
-- **Ctrl/⌘ + wheel** or the zoom buttons send a two-finger **pinch**. Android uses the
-  scrcpy control channel for true multi-touch; tap, drag, scroll, Back and Home fall back
-  to adb single-touch when the channel is unavailable.
+- **Ctrl/⌘ + wheel** or the zoom buttons send a two-finger **pinch** on Android through the
+  scrcpy control channel. On Android, tap, drag, scroll, long-press, Back and Home always
+  use adb, so basic control does not depend on scrcpy starting.
 - The pill below the phone has Back, Home, Recents, volume, power, pinch zoom, keyboard
   input and a gesture guide.
 - **Focus mode** hides both rails; **Esc** returns.
@@ -270,8 +276,8 @@ docs/                        architecture, research, screenshots
   single touch, and WebDriverAgent-based pinch is future work.
 - **Demo scroll and pinch are static.** Tap, drag, Back and the install flow work; use a
   real Android phone for native scroll and pinch.
-- **The scrcpy multi-touch path is not hardware-tested here.** It is implemented against
-  scrcpy 3.3.3 and fails over to adb, but this environment has no Android device.
+- **The scrcpy pinch path is not hardware-tested here.** It is implemented against
+  scrcpy 3.3.3; single-touch input does not depend on it and always uses adb.
 - **Phone models are demo profiles.** They set name, OS, resolution and frame colour for
   the simulated device; they do not emulate a different OS or app runtime.
 - **No audio.** scrcpy audio forwarding is also a Stage 02 goal.
