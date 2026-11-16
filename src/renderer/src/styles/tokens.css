@@ -1,0 +1,167 @@
+/* ---------------------------------------------------------------------------
+   PhoneExplorer — design tokens
+   A dark, instrument-like workspace with a single signal-lime accent.
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #07080a;
+  --bg-deep: #050608;
+  --panel: #0b0d11;
+  --panel-2: #101318;
+  --panel-3: #151920;
+  --panel-4: #1b2028;
+
+  --line: rgba(255, 255, 255, 0.065);
+  --line-strong: rgba(255, 255, 255, 0.115);
+  --line-bright: rgba(255, 255, 255, 0.19);
+
+  --text: #eef1f5;
+  --text-2: #b2bac6;
+  --text-3: #7e8795;
+  --text-4: #59626f;
+
+  --accent: #d8ff63;
+  --accent-2: #bff23d;
+  --accent-ink: #0a0d05;
+  --accent-soft: rgba(216, 255, 99, 0.12);
+  --accent-line: rgba(216, 255, 99, 0.26);
+
+  --green: #3ddc84;
+  --blue: #4c9fff;
+  --ios: #0a84ff;
+  --android: #3ddc84;
+  --amber: #f4c15d;
+  --red: #ff6b6b;
+  --violet: #a78bfa;
+
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius: 13px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 45px 120px rgba(0, 0, 0, 0.7);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --phone-h: clamp(440px, calc(100vh - 306px), 690px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input {
+  min-width: 0;
+}
+
+img,
+svg {
+  display: block;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+::selection {
+  background: rgba(216, 255, 99, 0.24);
+  color: #fff;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(216, 255, 99, 0.7);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
