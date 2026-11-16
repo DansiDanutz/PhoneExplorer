@@ -103,6 +103,30 @@ try {
   await spotifyRow.locator('.get-btn.is-open').click();
   await page.waitForTimeout(600);
 
+  // Gestures: wheel scroll, long-press, right-click, middle-click and pinch.
+  const phone = await page.locator('.phone-screen').boundingBox();
+  if (!phone) throw new Error('phone screen has no box');
+  const cx = phone.x + phone.width / 2;
+  const cy = phone.y + phone.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, 240);
+  await page.waitForTimeout(350);
+  await page.mouse.down();
+  await page.waitForTimeout(760);
+  await page.mouse.up();
+  await page.waitForTimeout(250);
+  await page.mouse.click(cx, cy, { button: 'right' });
+  await page.waitForTimeout(200);
+  await page.mouse.click(cx, cy, { button: 'middle' });
+  await page.waitForTimeout(250);
+  await page.locator('.control-btn[aria-label="Pinch to zoom in"]').click();
+  await page.waitForTimeout(350);
+  const pinchToast = await page.locator('.toast-copy strong').last().textContent();
+  if (!pinchToast?.includes('Multi-touch control is not ready')) {
+    throw new Error(`unexpected pinch toast: ${pinchToast}`);
+  }
+  await page.screenshot({ path: join(shots, '13-controls.png') });
+
   // Store deep links and search.
   await page.locator('.stage-actions .btn-primary').click();
   await page.locator('.search-box input').fill('Notion');
@@ -125,6 +149,18 @@ try {
     if (!calls.some((call) => call.includes(needle))) {
       throw new Error(`missing adb call: ${needle}\n\n${calls.join('\n')}`);
     }
+  }
+  if (!calls.some((call) => call.includes('shell input swipe') && call.endsWith(' 180'))) {
+    throw new Error(`scroll did not reach adb\n${calls.join('\n')}`);
+  }
+  if (!calls.some((call) => call.includes('shell input swipe') && call.endsWith(' 700'))) {
+    throw new Error(`long press did not reach adb\n${calls.join('\n')}`);
+  }
+  if (!calls.some((call) => call.includes('shell input keyevent 4'))) {
+    throw new Error(`right-click back did not reach adb\n${calls.join('\n')}`);
+  }
+  if (!calls.some((call) => call.includes('shell input keyevent 3'))) {
+    throw new Error(`middle-click home did not reach adb\n${calls.join('\n')}`);
   }
   if (errors.length) throw new Error(`renderer errors: ${errors.join('; ')}`);
 

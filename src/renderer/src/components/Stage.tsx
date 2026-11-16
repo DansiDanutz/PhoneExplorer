@@ -12,6 +12,7 @@ interface StageProps {
   actions: PhoneActions;
   focusMode: boolean;
   onToggleFocus: () => void;
+  onOpenGuide: () => void;
 }
 
 export function Stage({
@@ -21,11 +22,29 @@ export function Stage({
   actions,
   focusMode,
   onToggleFocus,
+  onOpenGuide,
 }: StageProps): ReactElement {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [text, setText] = useState('');
   const device = state.devices.find((candidate) => candidate.id === state.activeDeviceId) ?? null;
   const liveFrame = frame && frame.deviceId === device?.id ? frame : null;
+  const multiTouch = device?.controlEngine === 'scrcpy';
+  const controlLabel = !device?.capabilities.input
+    ? 'VIEW ONLY'
+    : device.isDemo
+      ? 'DEMO INPUT'
+      : multiTouch
+        ? 'MULTI-TOUCH'
+        : device.controlEngine === 'idb'
+          ? 'IDB TOUCH'
+          : 'ADB TOUCH';
+  const gestureHint = !device?.capabilities.input
+    ? 'VIEW ONLY'
+    : multiTouch
+      ? 'TAP · DRAG · SCROLL · PINCH'
+      : device.isDemo
+        ? 'TAP · SWIPE'
+        : 'TAP · DRAG · SCROLL';
 
   if (!device) {
     return (
@@ -96,6 +115,12 @@ export function Stage({
                 </span>
               </>
             ) : null}
+            {device.displayInches ? (
+              <>
+                <span className="meta-sep" />
+                <span>{device.displayInches}&quot;</span>
+              </>
+            ) : null}
             {device.battery !== null ? (
               <>
                 <span className="meta-sep" />
@@ -149,7 +174,11 @@ export function Stage({
           frame={liveFrame}
           previewActive={state.preview.active}
           onTap={(x, y) => void actions.tap(x, y)}
+          onLongPress={(x, y) => void actions.longPress(x, y)}
           onSwipe={(x1, y1, x2, y2) => void actions.swipe(x1, y1, x2, y2)}
+          onScroll={(x, y, dx, dy) => void actions.scroll(x, y, dx, dy)}
+          onPinch={(x, y, scale) => void actions.pinch(x, y, scale)}
+          onPress={(key) => void actions.press(key)}
           onStartPreview={() => void actions.startPreview()}
         />
       </div>
@@ -216,6 +245,27 @@ export function Stage({
             </button>
           </div>
           <span className="control-divider" />
+          <div className="control-group">
+            <button
+              type="button"
+              className="control-btn"
+              onClick={() => void actions.pinch(0.5, 0.5, 0.74)}
+              title="Pinch to zoom out"
+              aria-label="Pinch to zoom out"
+            >
+              <Icon name="zoom-out" size={18} />
+            </button>
+            <button
+              type="button"
+              className="control-btn"
+              onClick={() => void actions.pinch(0.5, 0.5, 1.35)}
+              title="Pinch to zoom in"
+              aria-label="Pinch to zoom in"
+            >
+              <Icon name="zoom-in" size={18} />
+            </button>
+          </div>
+          <span className="control-divider" />
           <button
             type="button"
             className={`control-btn ${keyboardOpen ? 'is-active' : ''}`}
@@ -225,6 +275,15 @@ export function Stage({
             aria-expanded={keyboardOpen}
           >
             <Icon name="keyboard" size={19} />
+          </button>
+          <button
+            type="button"
+            className="control-btn"
+            onClick={onOpenGuide}
+            title="Gesture guide"
+            aria-label="Gesture guide"
+          >
+            <Icon name="info" size={18} />
           </button>
         </div>
 
@@ -295,8 +354,10 @@ export function Stage({
           )}
         </div>
         <div className="foot-right">
-          <span className="mono-label">
-            {device.capabilities.input ? 'CLICK TO TAP · DRAG TO SWIPE' : 'VIEW ONLY'}
+          <span className="mono-label">{gestureHint}</span>
+          <span className="foot-sep" />
+          <span className={`mono-label control-state ${multiTouch ? 'is-native' : ''}`}>
+            {controlLabel}
           </span>
           <span className="foot-sep" />
           <span className="mono-label">{state.settings.fps} FPS TARGET</span>

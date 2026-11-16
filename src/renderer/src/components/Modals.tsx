@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactElement, type ReactNode } from 'react';
-import type { AppState, CatalogApp, QrPayload } from '@shared/types';
+import type { AppState, CatalogApp, PhonePlatform, QrPayload } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
 import { storeName } from '../lib/format';
 import { Icon } from '../lib/icons';
@@ -12,7 +12,7 @@ interface OverlayProps {
   label: string;
 }
 
-function Overlay({ children, onClose, className, label }: OverlayProps): ReactElement {
+export function Overlay({ children, onClose, className, label }: OverlayProps): ReactElement {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose();
@@ -257,6 +257,7 @@ interface SettingsProps {
   state: AppState;
   actions: PhoneActions;
   onClose: () => void;
+  onOpenModels: (platform: PhonePlatform) => void;
 }
 
 function Toggle({
@@ -282,9 +283,18 @@ function Toggle({
   );
 }
 
-export function SettingsSheet({ state, actions, onClose }: SettingsProps): ReactElement {
+export function SettingsSheet({
+  state,
+  actions,
+  onClose,
+  onOpenModels,
+}: SettingsProps): ReactElement {
   const [adbPath, setAdbPath] = useState(state.settings.adbPath);
   const [savedPath, setSavedPath] = useState(state.settings.adbPath);
+  const defaultAndroid = state.models.find(
+    (model) => model.id === state.defaultModels.android,
+  );
+  const defaultIos = state.models.find((model) => model.id === state.defaultModels.ios);
 
   useEffect(() => {
     setAdbPath(state.settings.adbPath);
@@ -382,8 +392,44 @@ export function SettingsSheet({ state, actions, onClose }: SettingsProps): React
           </div>
           <div className="setting-row">
             <div className="setting-copy">
-              <span>Default demo phone</span>
-              <small>Used when no physical device is selected.</small>
+              <span>Default Android model</span>
+              <small>
+                {defaultAndroid
+                  ? `${defaultAndroid.manufacturer} · ${defaultAndroid.screen.width}×${defaultAndroid.screen.height}`
+                  : 'Not set'}
+              </small>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => onOpenModels('android')}
+            >
+              <span className="setting-model-name">{defaultAndroid?.name ?? 'Choose'}</span>
+              <Icon name="chevron-right" size={12} />
+            </button>
+          </div>
+          <div className="setting-row">
+            <div className="setting-copy">
+              <span>Default iPhone model</span>
+              <small>
+                {defaultIos
+                  ? `${defaultIos.manufacturer} · ${defaultIos.screen.width}×${defaultIos.screen.height}`
+                  : 'Not set'}
+              </small>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => onOpenModels('ios')}
+            >
+              <span className="setting-model-name">{defaultIos?.name ?? 'Choose'}</span>
+              <Icon name="chevron-right" size={12} />
+            </button>
+          </div>
+          <div className="setting-row">
+            <div className="setting-copy">
+              <span>Startup demo</span>
+              <small>Which demo tab opens when there is no physical device.</small>
             </div>
             <div className="segmented">
               <button
@@ -401,6 +447,23 @@ export function SettingsSheet({ state, actions, onClose }: SettingsProps): React
                 iPhone
               </button>
             </div>
+          </div>
+          <div className="setting-row">
+            <div className="setting-copy">
+              <span>Custom models</span>
+              <small>
+                {state.settings.customModels.length} saved · add a profile with its own screen and
+                frame colour.
+              </small>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => onOpenModels(state.settings.demoPlatform)}
+            >
+              Manage
+              <Icon name="chevron-right" size={12} />
+            </button>
           </div>
         </section>
 

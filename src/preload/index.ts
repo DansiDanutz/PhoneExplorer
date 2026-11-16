@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   KeyAction,
+  NewPhoneModel,
   PhoneAPI,
   PhonePlatform,
   ServerEvent,
@@ -15,11 +16,22 @@ const api: PhoneAPI = {
   refresh: () => invoke('phone:refresh'),
   selectDevice: (deviceId: string) => invoke('phone:select', deviceId),
   useDemo: (platform: PhonePlatform | null) => invoke('phone:demo', platform),
+  selectDemoModel: (platform: PhonePlatform, modelId: string) =>
+    invoke('phone:model:select', platform, modelId),
+  setDefaultModel: (platform: PhonePlatform, modelId: string) =>
+    invoke('phone:model:default', platform, modelId),
+  addPhoneModel: (input: NewPhoneModel) => invoke('phone:model:add', input),
+  deletePhoneModel: (modelId: string) => invoke('phone:model:delete', modelId),
   startPreview: () => invoke('phone:preview:start'),
   stopPreview: () => invoke('phone:preview:stop'),
   tap: (x: number, y: number) => invoke('phone:tap', x, y),
+  longPress: (x: number, y: number, durationMs?: number) =>
+    invoke('phone:longpress', x, y, durationMs),
   swipe: (x1: number, y1: number, x2: number, y2: number, durationMs?: number) =>
     invoke('phone:swipe', x1, y1, x2, y2, durationMs),
+  scroll: (x: number, y: number, deltaX: number, deltaY: number) =>
+    invoke('phone:scroll', x, y, deltaX, deltaY),
+  pinch: (x: number, y: number, scale: number) => invoke('phone:pinch', x, y, scale),
   press: (key: KeyAction) => invoke('phone:press', key),
   typeText: (text: string) => invoke('phone:type', text),
   openStore: (appId?: string) => invoke('phone:store:open', appId),

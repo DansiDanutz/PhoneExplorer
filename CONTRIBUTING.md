@@ -22,12 +22,13 @@ node node_modules/electron/install.js
 npm run typecheck
 npm test
 npm run e2e
+npm run e2e:models
+npm run e2e:gestures
 npm run e2e:real
 ```
 
-`npm run e2e` and `e2e:real` launch Electron with `--no-sandbox` for CI/agent environments.
-They do not require a phone. If you add a scene or a device command, extend the relevant
-test.
+These launch Electron with `--no-sandbox` for CI/agent environments. They do not require a
+phone. If you add a scene, model or input command, extend the relevant test.
 
 ## Real-device reports
 
@@ -48,6 +49,12 @@ Never paste store credentials, Apple ID tokens, or full device backups.
 - Device work belongs in `src/main/services`, not in React components.
 - Every user-visible failure should reach Activity with a readable detail.
 - Demo screens are SVG; keep them free of external images and third-party marks.
+- Demo hardware lives in `src/shared/phone-models.ts`; real devices are never affected by it.
+- New gestures need both a native path and an adb fallback, and must not double-fire on a
+  hotspot. The right-click/middle-click handlers live on the screen, not the pointerdown.
+- `vendor/scrcpy-server` is an unmodified third-party binary. Bump the server, the
+  `@yume-chan` packages and the SHA-256 in `vendor/README.md` together, then re-test the
+  fallback path.
 - Run `xmllint --noout` over generated scene SVGs if you touch the demo engine.
 
 ## Adding a catalog app

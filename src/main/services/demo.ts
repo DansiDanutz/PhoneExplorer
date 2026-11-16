@@ -1,10 +1,12 @@
 import { CATALOG, CATALOG_BY_ID, searchCatalog } from '../../shared/catalog';
 import { markToSvg } from '../../shared/marks';
+import { defaultPhoneModel } from '../../shared/phone-models';
 import type {
   CatalogApp,
   DeviceInfo,
   Hotspot,
   MarkName,
+  PhoneModel,
   PhonePlatform,
 } from '../../shared/types';
 
@@ -1182,26 +1184,41 @@ export class DemoDevice {
   private lastTick = 0;
   private lastMinute = '';
   private bootedAt = Date.now();
+  private model: PhoneModel;
 
-  constructor(platform: PhonePlatform) {
+  constructor(platform: PhonePlatform, model: PhoneModel = defaultPhoneModel(platform)) {
     this.platform = platform;
     this.id = `demo-${platform}`;
+    this.model = model;
+  }
+
+  /** Swap the demo hardware profile. Resets navigation, keeps installed apps. */
+  setModel(model: PhoneModel): void {
+    if (model.platform !== this.platform) return;
+    this.model = model;
+    this.stack = [{ kind: 'home' }];
+    this.install = null;
+    this.query = '';
+    this.bootedAt = Date.now();
   }
 
   info(): DeviceInfo {
-    const isIos = this.platform === 'ios';
     return {
       id: this.id,
-      name: isIos ? 'iPhone 16 Pro' : 'Pixel 9 Pro',
-      model: isIos ? 'iPhone 16 Pro' : 'Google Pixel 9 Pro',
+      name: this.model.name,
+      model: this.model.name,
       platform: this.platform,
-      osVersion: isIos ? '26.1' : '16',
+      osVersion: this.model.osVersion,
       connection: 'virtual',
       status: 'online',
-      serial: isIos ? 'DEMO-IPHONE-16P' : 'DEMO-PIXEL-9P',
-      resolution: { width: DEMO_WIDTH, height: DEMO_HEIGHT },
+      serial: `DEMO-${this.model.id.replace(/[^a-z0-9]+/gi, '-').toUpperCase().slice(0, 18)}`,
+      resolution: { ...this.model.screen },
       battery: this.battery,
       isDemo: true,
+      modelId: this.model.id,
+      frameColor: this.model.frameColor,
+      displayInches: this.model.displayInches,
+      controlEngine: 'demo',
       capabilities: {
         mirror: true,
         input: true,
@@ -1210,7 +1227,7 @@ export class DemoDevice {
         installFile: false,
         installedApps: true,
       },
-      hint: 'Interactive demo device — every control is simulated locally.',
+      hint: `Interactive demo · ${this.model.manufacturer} ${this.model.name} · ${this.model.screen.width}×${this.model.screen.height}`,
     };
   }
 

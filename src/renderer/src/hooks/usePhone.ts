@@ -3,6 +3,7 @@ import type {
   AppState,
   FramePayload,
   KeyAction,
+  NewPhoneModel,
   PhonePlatform,
   Settings,
 } from '@shared/types';
@@ -20,10 +21,17 @@ export interface PhoneActions {
   refresh: () => Promise<void>;
   selectDevice: (id: string) => Promise<void>;
   useDemo: (platform: PhonePlatform | null) => Promise<void>;
+  selectDemoModel: (platform: PhonePlatform, modelId: string) => Promise<void>;
+  setDefaultModel: (platform: PhonePlatform, modelId: string) => Promise<void>;
+  addPhoneModel: (input: NewPhoneModel) => Promise<void>;
+  deletePhoneModel: (modelId: string) => Promise<void>;
   startPreview: () => Promise<void>;
   stopPreview: () => Promise<void>;
   tap: (x: number, y: number) => Promise<void>;
+  longPress: (x: number, y: number) => Promise<void>;
   swipe: (x1: number, y1: number, x2: number, y2: number) => Promise<void>;
+  scroll: (x: number, y: number, deltaX: number, deltaY: number) => Promise<void>;
+  pinch: (x: number, y: number, scale: number) => Promise<void>;
   press: (key: KeyAction) => Promise<void>;
   typeText: (text: string) => Promise<void>;
   openStore: (appId?: string) => Promise<void>;
@@ -160,11 +168,33 @@ export function usePhone(): {
       setToasts([]);
       await apply(window.phone.useDemo(platform), 'Could not switch to the demo');
     },
+    selectDemoModel: async (platform, modelId) => {
+      setFrame(null);
+      setToasts([]);
+      await apply(
+        window.phone.selectDemoModel(platform, modelId),
+        'Could not change the demo model',
+      );
+    },
+    setDefaultModel: (platform, modelId) =>
+      apply(
+        window.phone.setDefaultModel(platform, modelId),
+        'Could not save the default model',
+      ),
+    addPhoneModel: (input) =>
+      apply(window.phone.addPhoneModel(input), 'Could not add the phone model'),
+    deletePhoneModel: (modelId) =>
+      apply(window.phone.deletePhoneModel(modelId), 'Could not delete the phone model'),
     startPreview: () => apply(window.phone.startPreview(), 'Could not start the preview'),
     stopPreview: () => apply(window.phone.stopPreview(), 'Could not stop the preview'),
     tap: (x, y) => window.phone.tap(x, y).catch(fail('Tap failed')),
+    longPress: (x, y) => window.phone.longPress(x, y).catch(fail('Long press failed')),
     swipe: (x1, y1, x2, y2) =>
       window.phone.swipe(x1, y1, x2, y2).catch(fail('Swipe failed')),
+    scroll: (x, y, deltaX, deltaY) =>
+      window.phone.scroll(x, y, deltaX, deltaY).catch(fail('Scroll failed')),
+    pinch: (x, y, scale) =>
+      window.phone.pinch(x, y, scale).catch(fail('Pinch failed')),
     press: (key) => window.phone.press(key).catch(fail('Key press failed')),
     typeText: (text) => window.phone.typeText(text).catch(fail('Typing failed')),
     openStore: (appId) => window.phone.openStore(appId).catch(fail('Could not open the store')),

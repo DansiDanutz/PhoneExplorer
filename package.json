@@ -16,6 +16,8 @@
     "dist:dir": "electron-vite build && electron-builder --dir",
     "shot": "electron-vite build && electron . --demo --screenshot .shots/app.png --screenshot-delay 1800",
     "e2e": "npm run build && node scripts/e2e.mjs",
+    "e2e:models": "npm run build && node scripts/e2e-models.mjs",
+    "e2e:gestures": "npm run build && node scripts/e2e-gestures.mjs",
     "e2e:real": "npm run build && node scripts/e2e-real.mjs",
     "showcase": "npm run build && node scripts/showcase.mjs",
     "icon": "node scripts/make-icon.mjs"
@@ -44,5 +46,11 @@
   "homepage": "https://github.com/DansiDanutz/PhoneExplorer#readme",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@yume-chan/adb": "^2.6.4",
+    "@yume-chan/adb-scrcpy": "^2.3.2",
+    "@yume-chan/adb-server-node-tcp": "^2.5.2",
+    "@yume-chan/scrcpy": "^2.3.0"
   }
 }

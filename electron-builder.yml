@@ -9,6 +9,11 @@ files:
   - package.json
 asar: true
 npmRebuild: false
+extraResources:
+  - from: vendor/scrcpy-server
+    to: scrcpy-server
+  - from: vendor/LICENSE.scrcpy
+    to: LICENSE.scrcpy
 electronDist: node_modules/electron/dist
 mac:
   category: public.app-category.developer-tools

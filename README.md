@@ -4,10 +4,11 @@
 
 **Stage 01 — a desktop bridge for your phone.**
 
-PhoneExplorer puts an Android phone or iPhone on your desktop: a near-live screen, the
-real Google Play / App Store listing, one place to install, and one click to launch.
-It is built with Electron, TypeScript and React, and it talks to phones through the
-open-source tools the platform already has — `adb`, `libimobiledevice` and `idb`.
+PhoneExplorer puts an Android phone or iPhone on your desktop: a near-live screen, real
+touch control, the real Google Play / App Store listing, one place to install, and one
+click to launch. It is built with Electron, TypeScript and React, and it talks to phones
+through the open-source tools the platform already has — `adb`, `libimobiledevice`,
+`idb`, and a vendored scrcpy control server.
 
 ![PhoneExplorer showing a simulated Pixel 9 Pro, Google Play and the Discover panel](docs/screenshots/home.png)
 
@@ -41,7 +42,8 @@ is always a user action. No phone? A complete interactive demo phone runs locall
 | --- | --- | --- |
 | Device discovery | `adb devices`, USB + Wi-Fi | `libimobiledevice` or `idb` |
 | Screen preview | `adb exec-out screencap` at 1–10 fps | `idb screenshot` or `idevicescreenshot` |
-| Tap / swipe / keys | `adb shell input` | `idb ui` (touch) |
+| Touch control | tap, drag, wheel-scroll, long-press, pinch, Back/Home keys | tap, drag, wheel-scroll, Back/Home edge swipes |
+| Multi-touch | scrcpy control channel (auto, Android 5+) | single touch via idb |
 | Store deep link | `market://details`, `market://search` | `itms-apps://` via `idb open-url` |
 | Install detection | watches `pm list packages` | watches `idb list-apps` |
 | Launch app | `monkey` / `am start` | `idb launch` or `devicectl` |
@@ -50,7 +52,7 @@ is always a user action. No phone? A complete interactive demo phone runs locall
 
 **Near-live, not video (yet).** Stage 01 captures screenshots at a configurable rate
 instead of decoding a video stream. It is enough to judge layouts, navigate the store and
-see an app open. A scrcpy/WebCodecs pipeline is the first item on the roadmap.
+see an app open. A scrcpy video/WebCodecs pipeline is the first item on the roadmap.
 
 ### The demo lab
 
@@ -58,6 +60,13 @@ Both demo devices are interactive end to end. Tapping **Get** inside the simulat
 runs a real install animation, adds the icon to the home screen, flips the button to
 **Open**, and launches a scene built for that app. This makes the app usable immediately
 and gives the automated tests a hardware-free target.
+
+The two demo tabs are hardware profiles, not hard-coded names. Search 18 built-in
+Pixel/Galaxy/OnePlus/Xiaomi/Nothing and iPhone profiles, add a custom phone with its own
+resolution and frame colour, and choose a default Android and a default iPhone. The
+selection is persisted and used whenever the demo lab starts.
+
+![Phone models sheet with built-in and custom profiles](docs/screenshots/models.png)
 
 | | |
 | --- | --- |
@@ -132,9 +141,16 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **Installed** lists apps read from the device, including system apps matched to the
   catalog. Click any icon to launch it.
 - **Activity** is a timestamped log of every bridge command, launch and install event.
-- **Click the mirror** to tap; **drag** to swipe. The pill below the phone has Back, Home,
-  Recents, volume, power and a keyboard input.
+- **Click the mirror** to tap; **drag** to swipe. **Wheel** scrolls, **hold** long-presses,
+  **right-click** is Back and **middle-click** is Home.
+- **Ctrl/⌘ + wheel** or the zoom buttons send a two-finger **pinch**. Android uses the
+  scrcpy control channel for true multi-touch; tap, drag, scroll, Back and Home fall back
+  to adb single-touch when the channel is unavailable.
+- The pill below the phone has Back, Home, Recents, volume, power, pinch zoom, keyboard
+  input and a gesture guide.
 - **Focus mode** hides both rails; **Esc** returns.
+
+![Gesture guide explaining tap, drag, scroll, pinch and hold](docs/screenshots/gestures.png)
 
 Other screens: [app detail](docs/screenshots/app-detail.png) ·
 [installed apps](docs/screenshots/installed.png) ·
@@ -190,9 +206,11 @@ npm run dev         # electron-vite dev server + Electron
 npm run build       # build main, preload and renderer
 npm run typecheck   # strict TS across all three targets
 npm test            # unit + scene rendering tests
-npm run e2e         # Playwright: demo install → open → iPhone → settings
-npm run e2e:real    # Playwright + a fake adb: discovery, mirror, install, launch
-npm run showcase    # regenerate docs/showcase screenshots
+npm run e2e          # Playwright: demo install → open → iPhone → settings
+npm run e2e:models   # model search, custom profile, defaults, delete
+npm run e2e:gestures # guide, right-click Back, scroll/pinch fallbacks
+npm run e2e:real     # Playwright + a fake adb: discovery, mirror, install, gestures, launch
+npm run showcase     # regenerate docs/showcase screenshots
 npm run icon        # rebuild build/icon.png + icon.icns
 npm run dist        # electron-builder: dmg + zip (macOS)
 ```
@@ -204,10 +222,15 @@ npm run dist        # electron-builder: dmg + zip (macOS)
   with `xmllint` in development.
 - **Demo E2E** drives the real renderer with Playwright: connect, store, install, open,
   iPhone switch, app sheet, QR, focus mode, settings and connect sheet.
+- **Model E2E** searches the catalog, switches hardware, creates a custom model, sets both
+  platform defaults, verifies persistence and deletes the custom profile.
+- **Gesture E2E** checks the guide, right-click Back, wheel-scroll, pinch fallback and
+  long-press on the demo.
 - **Real-path E2E** points the app at `scripts/fake-adb.mjs`, a tiny adb stand-in that
   implements device discovery, screenshots, package lists, input and store deep links.
   It proves the Android pipeline without hardware: frame capture, install detection via
-  `pm list packages`, `monkey` launch, and `market://` links.
+  `pm list packages`, `monkey` launch, `market://` links, wheel scroll, long-press,
+  right/middle-click Back/Home, and the multi-touch-unavailable fallback.
 
 > The E2E scripts launch Electron with `--no-sandbox` because they run inside a CI/agent
 > sandbox. The shipped app keeps Chromium's sandbox on.
@@ -222,13 +245,16 @@ src/
       manager.ts             state, device orchestration, preview + install watchers
       adb.ts                 adb wrapper + parsers
       ios.ts                 idb / libimobiledevice / devicectl bridge
+      scrcpy-control.ts      control-only scrcpy session (multi-touch, pinch, scroll)
       demo.ts                interactive simulated phones (SVG scene engine)
   preload/index.ts           contextBridge API
   renderer/                  React UI (no UI framework, hand-built design system)
-  shared/                    types, app catalog, store links, monogram marks
+  shared/                    types, app catalog, phone models, store links, marks
+vendor/
+  scrcpy-server              unmodified scrcpy 3.3.3 control server (Apache-2.0)
 scripts/
-  e2e.mjs · e2e-real.mjs · fake-adb.mjs · showcase.mjs
-  contact-sheet.mjs · make-icon.mjs · fixture-screen.mjs
+  e2e.mjs · e2e-real.mjs · e2e-models.mjs · e2e-gestures.mjs
+  fake-adb.mjs · showcase.mjs · contact-sheet.mjs · make-icon.mjs · fixture-screen.mjs
 docs/                        architecture, research, screenshots
 ```
 
@@ -236,9 +262,18 @@ docs/                        architecture, research, screenshots
 
 ## Limitations (Stage 01)
 
-- **Preview is screenshot polling**, capped at 10 fps. Latency is typically a few hundred
-  milliseconds. Stage 02 will decode scrcpy's H.264 stream in the renderer with WebCodecs
-  for 30–60 fps and real input latency.
+- **Preview is screenshot polling**, capped at 10 fps. Input is independent of the frame
+  rate, but visual feedback has a few hundred milliseconds of lag. Stage 02 will decode
+  scrcpy's H.264 stream with WebCodecs for 30–60 fps video. The scrcpy control channel is
+  already wired for multi-touch.
+- **Pinch is Android-only.** It needs the scrcpy control channel; the iPhone bridge injects
+  single touch, and WebDriverAgent-based pinch is future work.
+- **Demo scroll and pinch are static.** Tap, drag, Back and the install flow work; use a
+  real Android phone for native scroll and pinch.
+- **The scrcpy multi-touch path is not hardware-tested here.** It is implemented against
+  scrcpy 3.3.3 and fails over to adb, but this environment has no Android device.
+- **Phone models are demo profiles.** They set name, OS, resolution and frame colour for
+  the simulated device; they do not emulate a different OS or app runtime.
 - **No audio.** scrcpy audio forwarding is also a Stage 02 goal.
 - **iPhone live capture** uses the same screenshot loop. A native CoreMediaIO/AVFoundation
   helper (the path QuickTime uses) is the next step; macOS 15's iPhone Mirroring has no
@@ -247,7 +282,7 @@ docs/                        architecture, research, screenshots
   platform design. The QR fallback covers phones where idb cannot open URLs.
 - **Notion, Slack and store metadata** in the catalog are illustrative. IDs can change;
   the real listing is always the phone's.
-- The Android code path is covered by the fake-adb E2E but has not been run against a
+- The Android pipeline is covered by the fake-adb E2E but has not been run against a
   physical phone in this environment. The iPhone bridge was likewise validated against
   its command contract, not hardware. See [docs/RESEARCH.md](docs/RESEARCH.md) for the
   support matrix and how to contribute real-device logs.
@@ -264,8 +299,9 @@ what we deliberately did not, and licenses — is in [docs/RESEARCH.md](docs/RES
 - [Escrcpy](https://github.com/viarotel-org/escrcpy) — an Electron GUI over scrcpy; the
   clearest prior art for this product shape.
 - [QtScrcpy](https://github.com/barry-ran/QtScrcpy) — cross-platform GUI and key-mapping.
-- [@yume-chan/scrcpy](https://github.com/yume-chan/scrcpy) — TypeScript scrcpy protocol
-  and WebCodecs decoders; our planned Stage 02 path.
+- [@yume-chan/scrcpy](https://github.com/yume-chan/scrcpy) — TypeScript scrcpy protocol.
+  Stage 01 uses its control channel; the WebCodecs video path is planned for Stage 02.
+  The vendored `scrcpy-server` is unmodified scrcpy 3.3.3 (Apache-2.0).
 - [libimobiledevice](https://libimobiledevice.org) and [idb](https://github.com/facebook/idb)
   — the iPhone bridge.
 - [electron-vite](https://electron-vite.org) and

@@ -1,13 +1,16 @@
 import { _electron as electron } from 'playwright-core';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 
 const shots = new URL('../.shots/', import.meta.url).pathname;
+const dataDir = new URL('../.data/e2e/', import.meta.url).pathname;
 await mkdir(shots, { recursive: true });
+await rm(dataDir, { recursive: true, force: true });
+await mkdir(dataDir, { recursive: true });
 
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 env.PHONEEXPLORER_E2E = '1';
-env.PHONEEXPLORER_DATA_DIR = new URL('../.data/e2e/', import.meta.url).pathname;
+env.PHONEEXPLORER_DATA_DIR = dataDir;
 
 const app = await electron.launch({
   args: ['.', '--no-sandbox', '--disable-gpu'],
@@ -89,7 +92,7 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 
 // iPhone demo.
-await page.locator('.demo-btn').filter({ hasText: 'iPhone 16 Pro' }).click();
+await page.locator('.demo-card').filter({ hasText: 'iPhone 16 Pro' }).locator('.demo-card-pick').click();
 await page.waitForTimeout(900);
 await page.getByRole('tab', { name: /Discover/ }).click();
 await page.locator('.stage-actions .btn-primary').click();

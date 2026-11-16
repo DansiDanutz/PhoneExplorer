@@ -45,7 +45,11 @@ export type IconName =
   | 'lock'
   | 'pulse'
   | 'smartphone'
-  | 'trash';
+  | 'trash'
+  | 'star'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'clock';
 
 const PATHS: Record<IconName, ReactElement> = {
   refresh: (
@@ -268,6 +272,25 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l.9 13h9.2l.9-13" />
       <path d="M10 11v5.5M14 11v5.5" />
+    </>
+  ),
+  star: <path d="m12 3.4 2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.7l6-.9z" />,
+  'zoom-in': (
+    <>
+      <circle cx="10.6" cy="10.6" r="6.2" />
+      <path d="m19.8 19.8-4.4-4.4M8 10.6h5.2M10.6 8v5.2" />
+    </>
+  ),
+  'zoom-out': (
+    <>
+      <circle cx="10.6" cy="10.6" r="6.2" />
+      <path d="m19.8 19.8-4.4-4.4M8 10.6h5.2" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M12 7.4V12l3.2 2" />
     </>
   ),
 };

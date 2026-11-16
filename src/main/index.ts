@@ -11,6 +11,7 @@ import {
 } from 'electron';
 import type {
   KeyAction,
+  NewPhoneModel,
   PhonePlatform,
   ServerEvent,
   Settings,
@@ -220,9 +221,24 @@ function registerIpc(instance: DeviceManager): void {
   handle('phone:refresh', () => instance.refreshDevices());
   handle('phone:select', (id: string) => instance.selectDevice(id));
   handle('phone:demo', (platform: PhonePlatform | null) => instance.useDemo(platform));
+  handle('phone:model:select', (platform: PhonePlatform, modelId: string) =>
+    instance.selectDemoModel(platform, modelId),
+  );
+  handle('phone:model:default', (platform: PhonePlatform, modelId: string) =>
+    instance.setDefaultModel(platform, modelId),
+  );
+  handle('phone:model:add', (input: NewPhoneModel) => instance.addPhoneModel(input));
+  handle('phone:model:delete', (modelId: string) => instance.deletePhoneModel(modelId));
   handle('phone:preview:start', () => instance.startPreview());
   handle('phone:preview:stop', () => instance.stopPreview());
   handle('phone:tap', (x: number, y: number) => instance.tap(x, y));
+  handle('phone:longpress', (x: number, y: number, duration?: number) =>
+    instance.longPress(x, y, duration),
+  );
+  handle('phone:scroll', (x: number, y: number, dx: number, dy: number) =>
+    instance.scroll(x, y, dx, dy),
+  );
+  handle('phone:pinch', (x: number, y: number, scale: number) => instance.pinch(x, y, scale));
   handle(
     'phone:swipe',
     (x1: number, y1: number, x2: number, y2: number, duration?: number) =>

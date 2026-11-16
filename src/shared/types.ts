@@ -7,6 +7,9 @@ export type PhonePlatform = 'android' | 'ios';
 export type DeviceConnection = 'usb' | 'wifi' | 'virtual';
 export type DeviceStatus = 'online' | 'unauthorized' | 'offline' | 'connecting' | 'error';
 
+/** How input is injected into the active phone. */
+export type ControlEngine = 'scrcpy' | 'adb' | 'idb' | 'demo';
+
 export type Capability =
   | 'mirror'
   | 'input'
@@ -36,6 +39,11 @@ export interface DeviceInfo {
   resolution: { width: number; height: number } | null;
   battery: number | null;
   isDemo: boolean;
+  /** Present on demo devices: the selected hardware profile. */
+  modelId?: string;
+  frameColor?: string;
+  displayInches?: number;
+  controlEngine?: ControlEngine;
   capabilities: DeviceCapabilities;
   /** Short, user-facing explanation when something is degraded. */
   hint: string | null;
@@ -143,6 +151,27 @@ export interface InstallProgress {
   message: string;
 }
 
+export interface PhoneScreen {
+  width: number;
+  height: number;
+}
+
+/** A demo hardware profile, either built in or created by the user. */
+export interface PhoneModel {
+  id: string;
+  platform: PhonePlatform;
+  name: string;
+  manufacturer: string;
+  osVersion: string;
+  screen: PhoneScreen;
+  displayInches: number;
+  frameColor: string;
+  year: number;
+  builtin: boolean;
+}
+
+export type NewPhoneModel = Omit<PhoneModel, 'id' | 'builtin' | 'year'>;
+
 export interface Settings {
   fps: number;
   quality: number;
@@ -150,6 +179,9 @@ export interface Settings {
   adbPath: string;
   demoPlatform: PhonePlatform;
   reduceMotion: boolean;
+  customModels: PhoneModel[];
+  defaultAndroidModelId: string;
+  defaultIosModelId: string;
 }
 
 export interface AppState {
@@ -157,6 +189,8 @@ export interface AppState {
   activeDeviceId: string | null;
   installed: InstalledApp[];
   catalog: CatalogApp[];
+  models: PhoneModel[];
+  defaultModels: { android: string; ios: string };
   activity: ActivityItem[];
   preview: PreviewState;
   installs: Record<string, InstallProgress>;
@@ -210,10 +244,17 @@ export interface PhoneAPI {
   refresh(): Promise<AppState>;
   selectDevice(deviceId: string): Promise<AppState>;
   useDemo(platform: PhonePlatform | null): Promise<AppState>;
+  selectDemoModel(platform: PhonePlatform, modelId: string): Promise<AppState>;
+  setDefaultModel(platform: PhonePlatform, modelId: string): Promise<AppState>;
+  addPhoneModel(input: NewPhoneModel): Promise<AppState>;
+  deletePhoneModel(modelId: string): Promise<AppState>;
   startPreview(): Promise<AppState>;
   stopPreview(): Promise<AppState>;
   tap(x: number, y: number): Promise<void>;
+  longPress(x: number, y: number, durationMs?: number): Promise<void>;
   swipe(x1: number, y1: number, x2: number, y2: number, durationMs?: number): Promise<void>;
+  scroll(x: number, y: number, deltaX: number, deltaY: number): Promise<void>;
+  pinch(x: number, y: number, scale: number): Promise<void>;
   press(key: KeyAction): Promise<void>;
   typeText(text: string): Promise<void>;
   openStore(appId?: string): Promise<void>;

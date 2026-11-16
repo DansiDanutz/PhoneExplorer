@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import type { AppState, DeviceInfo } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
+import { truncate } from '../lib/format';
 import { Icon } from '../lib/icons';
 
 interface DeviceRailProps {
@@ -8,6 +9,7 @@ interface DeviceRailProps {
   actions: PhoneActions;
   onOpenConnect: () => void;
   onOpenSettings: () => void;
+  onOpenModels: (platform: 'android' | 'ios') => void;
 }
 
 function DeviceCard({
@@ -49,11 +51,23 @@ export function DeviceRail({
   actions,
   onOpenConnect,
   onOpenSettings,
+  onOpenModels,
 }: DeviceRailProps): ReactElement {
   const real = state.devices.filter((device) => !device.isDemo);
   const active = state.devices.find((device) => device.id === state.activeDeviceId) ?? null;
   const toolsReady = state.tools.filter((tool) => tool.found).length;
   const allReady = toolsReady === state.tools.length;
+  const demoInfo = (platform: 'android' | 'ios'): DeviceInfo | null =>
+    state.devices.find((device) => device.id === `demo-${platform}`) ?? null;
+  const demoModel = (platform: 'android' | 'ios') => {
+    const info = demoInfo(platform);
+    return (
+      state.models.find((model) => model.id === info?.modelId) ??
+      state.models.find((model) => model.id === state.defaultModels[platform]) ??
+      null
+    );
+  };
+  const activeDemoPlatform = active?.isDemo ? active.platform : state.settings.demoPlatform;
 
   return (
     <aside className="rail">
@@ -103,28 +117,75 @@ export function DeviceRail({
         <div className="rail-section">
           <div className="rail-heading">
             <span>Demo lab</span>
-            <span className="rail-note">No hardware needed</span>
-          </div>
-          <div className="demo-switch">
             <button
               type="button"
-              className={`demo-btn ${state.activeDeviceId === 'demo-android' ? 'is-active' : ''}`}
-              onClick={() => void actions.useDemo('android')}
+              className="rail-heading-link"
+              onClick={() => onOpenModels(activeDemoPlatform)}
             >
-              <Icon name="android" size={16} />
-              Pixel 9 Pro
-            </button>
-            <button
-              type="button"
-              className={`demo-btn ${state.activeDeviceId === 'demo-ios' ? 'is-active' : ''}`}
-              onClick={() => void actions.useDemo('ios')}
-            >
-              <Icon name="apple" size={15} />
-              iPhone 16 Pro
+              Models <Icon name="sliders" size={12} />
             </button>
           </div>
+          <div className="demo-list">
+            {(['android', 'ios'] as const).map((platform) => {
+              const model = demoModel(platform);
+              if (!model) return null;
+              const isActive = state.activeDeviceId === `demo-${platform}`;
+              const isDefault = state.defaultModels[platform] === model.id;
+              return (
+                <div className={`demo-card ${isActive ? 'is-active' : ''}`} key={platform}>
+                  <button
+                    type="button"
+                    className="demo-card-pick"
+                    onClick={() => void actions.useDemo(platform)}
+                    aria-pressed={isActive}
+                  >
+                    <span className="demo-platform" data-platform={platform}>
+                      <Icon name={platform === 'ios' ? 'apple' : 'android'} size={16} />
+                    </span>
+                    <span className="demo-card-copy">
+                      <span className="demo-card-name">{truncate(model.name, 22)}</span>
+                      <span className="demo-card-meta">
+                        {platform === 'ios' ? 'iOS' : 'Android'} {model.osVersion}
+                        <span className="dot-sep" />
+                        {model.displayInches}&quot;
+                        {isDefault || !model.builtin ? (
+                          <>
+                            <span className="dot-sep" />
+                            <span className={isDefault ? 'demo-default' : 'demo-custom'}>
+                              {isDefault ? 'DEFAULT' : 'CUSTOM'}
+                            </span>
+                          </>
+                        ) : null}
+                      </span>
+                    </span>
+                    <span className={`status-dot ${isActive ? 'ok' : 'idle'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    className="demo-card-edit"
+                    onClick={() => onOpenModels(platform)}
+                    title={`Change ${platform === 'ios' ? 'iPhone' : 'Android'} model`}
+                    aria-label={`Change ${platform === 'ios' ? 'iPhone' : 'Android'} model`}
+                  >
+                    <Icon name="sliders" size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="demo-browse"
+            onClick={() => onOpenModels(activeDemoPlatform)}
+          >
+            <Icon name="search" size={13} />
+            Search phone models
+            <span className="mono">
+              {state.models.filter((model) => model.platform === activeDemoPlatform).length}
+            </span>
+          </button>
           <p className="rail-hint">
-            An interactive, simulated phone. Store installs run end-to-end locally.
+            Simulated hardware profiles. Store installs still run end-to-end locally.
           </p>
         </div>
 
@@ -166,6 +227,20 @@ export function DeviceRail({
                   ) : (
                     '—'
                   )}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Input</span>
+                <span className={`detail-value ${active.controlEngine === 'scrcpy' ? 'ok-text' : ''}`}>
+                  {active.isDemo
+                    ? 'Demo'
+                    : active.controlEngine === 'scrcpy'
+                      ? 'Scrcpy · multi-touch'
+                      : active.controlEngine === 'idb'
+                        ? 'idb · touch'
+                        : active.capabilities.input
+                          ? 'adb · touch'
+                          : 'View only'}
                 </span>
               </div>
               <div className="detail-row">

@@ -31,9 +31,9 @@ Ideas taken:
 
 Ideas not taken (yet):
 
-- Shipping/embedding scrcpy. The native window is hard to embed in Electron on macOS, and
-  bundling per-platform binaries adds signing and update complexity. Stage 01 keeps the
-  dependency surface to `adb` only.
+- Embedding the native scrcpy window. It is hard to embed in Electron on macOS, and
+  bundling per-platform binaries adds signing and update complexity. Stage 01 ships the
+  cross-platform server jar for control only; it does not embed the native window.
 
 ### Escrcpy and QtScrcpy
 
@@ -65,7 +65,7 @@ implementation of the scrcpy protocol, including ADB over WebUSB/WebSocket, H.26
 demuxing, and WebCodecs/TinyH264 decoders. It is the most promising route to a true in-app
 30–60 fps mirror without native binaries.
 
-Why not in Stage 01:
+Why not the video path in Stage 01:
 
 - It is a larger dependency and protocol surface than the rest of the app combined.
 - It benefits from a real device to tune latency, keyframes and reconnects. We did not have
@@ -74,8 +74,12 @@ Why not in Stage 01:
 - The screenshot pipeline already validates discovery, input coordinates, store links and
   install detection. Those are reusable when the video path lands.
 
-It is the first item in the Stage 02 roadmap, behind a capability flag so the screenshot
-fallback remains available.
+Stage 01 now uses `@yume-chan/adb` and `@yume-chan/adb-scrcpy` for a **control-only**
+scrcpy session: the vendored scrcpy 3.3.3 server starts with `video=false`, and its
+control channel provides multi-touch pinch, scroll, drag and long-press while frames still
+come from the screenshot engine. This is intentionally half of the integration — the video
+path remains Stage 02 — but it closes the most important interaction gap without waiting
+for the decoder work. The session fails closed and every gesture falls back to adb.
 
 ## iPhone: no public screen-capture API
 
@@ -170,7 +174,8 @@ real listing and always verifies the real package/bundle id.
 | --- | --- | --- | --- | --- | --- |
 | `adb exec-out screencap` polling | 1–10 fps | adb only | Full resolution, re-encoded | Yes | **Chosen** |
 | scrcpy native window | 30–120 fps | scrcpy + native embedding | Excellent | No (separate window) | Rejected |
-| scrcpy protocol + WebCodecs | 30–60 fps | npm packages | Excellent | Yes | Stage 02 |
+| scrcpy control channel | n/a (input only) | npm + 88 KB server | Native input | Yes | **Chosen for Android input** |
+| scrcpy protocol + WebCodecs | 30–60 fps | npm packages | Excellent | Yes | Stage 02 video |
 | iOS `idevicescreenshot` / `idb screenshot` | ~1 fps | libimobiledevice/idb | Full resolution | Yes | **Chosen** |
 | iOS CoreMediaIO helper | 30–60 fps | Signed native helper | Excellent | Yes | Stage 02/03 |
 | WebDriverAgent screenshots | ~1–10 fps | Signed WDA + session | Full resolution | Yes | Rejected for now |
@@ -196,13 +201,15 @@ development loop for every generated screen.
 
 ## What we would do next
 
-1. **scrcpy + WebCodecs** for Android (30–60 fps, scrcpy control messages, audio later).
-2. **CoreMediaIO Swift helper** for iPhone live capture, plus notarization.
-3. **`adb pair`** for Android 11+ wireless debugging, not just `adb connect`.
-4. **UIAutomator / accessibility** queries so the app can find "Install" or "Open" by
+1. **scrcpy video + WebCodecs** on top of the existing control session (30–60 fps, audio
+   later).
+2. **iPhone multi-touch** through WebDriverAgent or a CoreMediaIO native helper.
+3. **CoreMediaIO Swift helper** for iPhone live capture, plus notarization.
+4. **`adb pair`** for Android 11+ wireless debugging, not just `adb connect`.
+5. **UIAutomator / accessibility** queries so the app can find "Install" or "Open" by
    label instead of relying on the user's tap.
-5. **Remote catalog** with verified store IDs, region-aware URLs, and icons from the store.
-6. **Signed/notarized releases** and a Homebrew cask.
+6. **Remote catalog** with verified store IDs, region-aware URLs, and icons from the store.
+7. **Signed/notarized releases** and a Homebrew cask.
 
 ## Sources
 

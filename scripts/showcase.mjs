@@ -59,7 +59,7 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
 
-  await page.locator('.demo-btn').filter({ hasText: 'iPhone 16 Pro' }).click();
+  await page.locator('.demo-card').filter({ hasText: 'iPhone 16 Pro' }).locator('.demo-card-pick').click();
   await page.waitForTimeout(1200);
   await page.getByRole('tab', { name: /Discover/ }).click();
   await page.locator('.stage-actions .btn-primary').click();

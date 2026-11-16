@@ -127,6 +127,34 @@ maps them to the device's pixel space, handling:
 
 This kept the renderer completely platform-agnostic: it only knows how big the image is.
 
+## Input and gestures
+
+The renderer is an input surface, not just a video view:
+
+| Gesture | Renderer event | Android | iPhone |
+| --- | --- | --- | --- |
+| Tap | pointer down/up | scrcpy control or `adb input tap` | `idb ui tap` |
+| Drag / swipe | pointer drag | scrcpy multi-point or `adb input swipe` | `idb ui swipe` |
+| Scroll | wheel | scrcpy `injectScroll`, else directional swipe | directional swipe |
+| Long press | 620 ms hold | scrcpy down/wait/up, else same-point swipe | same-point swipe |
+| Pinch | Ctrl/⌘+wheel or buttons | scrcpy two-pointer gesture | not available (single touch) |
+| Back | right-click | `adb keyevent 4` | left-edge system gesture |
+| Home | middle-click / button | `adb keyevent 3` | bottom-edge system gesture |
+
+The `ScrcpyControl` service keeps a **control-only** scrcpy session for the active Android
+device. It pushes the vendored `scrcpy-server` (3.3.3) to `/data/local/tmp`, starts it with
+`video=false audio=false control=true`, and writes touch/scroll messages through
+`ScrcpyControlMessageWriter`. Video still comes from the screenshot engine. The session
+starts in the background when an Android device is selected; until it is ready (or if it
+fails) gestures use the adb fallbacks. The control engine is shown in the stage footer and
+the connection card.
+
+The pinch sequence uses two pointer IDs. The first `ACTION_DOWN` creates the primary
+pointer; the second is sent as `ACTION_DOWN` too because scrcpy converts it to
+`ACTION_POINTER_DOWN | (index << SHIFT)` and the matching `ACTION_UP` to `ACTION_POINTER_UP`.
+Fingers are moved in 14 steps, then released in reverse order. Scroll is inverted from the
+browser's `deltaY` to Android's `AXIS_VSCROLL` convention.
+
 ## Install tracking
 
 Real devices cannot be installed onto programmatically through the store, so the flow is a
@@ -171,11 +199,22 @@ pretends to have installed something it did not.
 Because the output is SVG, the same engine produces crisp frames at any size and the demo
 can run on any OS without a device.
 
+## Phone models
+
+`src/shared/phone-models.ts` is the built-in hardware catalog: 9 Android and 9 iPhone
+profiles with name, manufacturer, OS, physical resolution, screen inches and frame colour.
+`DemoDevice` owns one profile; changing it resets navigation but keeps installed apps.
+Custom profiles live in `settings.customModels`, are validated in the main process, and
+are capped at 40. Each platform has a persisted default model ID. The Models sheet supports
+search by name, brand, OS, size or resolution, `Use`, `Set default` and delete. Selecting a
+model switches to that demo; adding one saves it as the platform default. Real devices are
+never affected by these profiles.
+
 ## State and IPC
 
 `DeviceManager.getState()` is the single snapshot: devices, active id, installed apps,
-catalog, activity, preview metadata, install progress, tool status, settings, version,
-platform, QR payload. Mutations call `emitState()`, which broadcasts a full snapshot. The
+catalog, phone models and defaults, activity, preview metadata, install progress, tool
+status, settings, version, platform, QR payload. Mutations call `emitState()`, which broadcasts a full snapshot. The
 renderer also merges high-frequency events (frames, install progress, activity, toasts)
 without waiting for a snapshot.
 
@@ -184,10 +223,12 @@ Channels follow a small convention:
 ```
 phone:state            phone:refresh          phone:select
 phone:demo             phone:preview:start    phone:preview:stop
-phone:tap              phone:swipe            phone:press        phone:type
+phone:tap              phone:longpress        phone:scroll       phone:pinch
+phone:swipe            phone:press            phone:type
 phone:store:open       phone:store:search     phone:app:install  phone:app:open
 phone:app:install-file phone:qr:show          phone:qr:hide      phone:external
 phone:wifi             phone:setting          phone:activity:clear
+phone:model:select     phone:model:default    phone:model:add    phone:model:delete
 ```
 
 Events are one channel, `phone:event`, with a discriminated union: `state`, `frame`,
@@ -226,6 +267,9 @@ demo platform, reduce motion. Settings are clamped on load and saved on change.
 - External store links are the only outbound traffic initiated by the app. No analytics,
   accounts, or background network services.
 - QR codes are generated locally with `qrcode` (bundled into main at build time).
+- The scrcpy server is a vendored, unmodified Apache-2.0 binary; it is pushed to the phone
+  only when an Android device is selected. It runs entirely over the USB/Wi-Fi ADB
+  connection and is removed by scrcpy's cleanup path.
 
 ## Testing
 
@@ -233,7 +277,10 @@ demo platform, reduce motion. Settings are clamped on load and saved on change.
 | --- | --- |
 | `vitest` scene tests | every demo screen on both platforms produces well-formed SVG; hotspots exist |
 | `scripts/e2e.mjs` | full renderer flow on the demo: store, install, open, iPhone, app sheet, QR, focus, settings |
-| `scripts/e2e-real.mjs` | real Android pipeline against a fake `adb`: discovery, `screencap` frames, install detection, `monkey` launch, `market://` links |
+| `scripts/e2e-models.mjs` | search, switch, add, default, persist and delete demo hardware profiles |
+| `scripts/e2e-gestures.mjs` | guide, right-click Back, wheel scroll, pinch fallback and long-press on the demo |
+| `scripts/e2e-real.mjs` | real Android pipeline against a fake `adb`: discovery, `screencap` frames, install detection, `monkey` launch, `market://` links, scroll, long-press, Back/Home, pinch fallback |
+| `scrcpy-control.test.ts` | the control session fails closed and rejects gestures when unavailable |
 | `xmllint` (dev) | every generated SVG is valid XML |
 
 The fake adb is not a mock of `AdbClient`; it is a process at the `adb` boundary. That
@@ -243,16 +290,19 @@ run exactly as they will with a real phone.
 ## Build
 
 `electron-vite` builds three bundles: main (CJS), preload (CJS) and renderer (ESM).
-`qrcode` is bundled into main rather than externalized, so the packaged app needs no
-production `node_modules`. `electron-builder.yml` produces a signed-ready DMG/ZIP target on
-macOS with the generated icon; Windows/Linux targets are configured but untested.
+`qrcode` is bundled into main. The ESM-only scrcpy packages stay externalized and are
+included as production dependencies; `vendor/scrcpy-server` is copied through
+`extraResources`. `electron-builder.yml` produces an unsigned DMG/ZIP target on macOS with
+the generated icon; Windows/Linux targets are configured but untested.
 
 ## Stage 02 candidates
 
-1. **scrcpy stream**: `@yume-chan/adb` + `@yume-chan/scrcpy` + WebCodecs decoder; 30–60 fps,
-   touch/keyboard via scrcpy control messages, audio later.
-2. **iOS live capture**: a small Swift helper using AVFoundation/CoreMediaIO (the mechanism
+1. **scrcpy video**: reuse the control session's ADB transport for the H.264 stream and
+   WebCodecs decoder; 30–60 fps, audio later.
+2. **iPhone multi-touch**: WebDriverAgent or a CoreMediaIO helper for pinch and app-switch
+   gestures. The current iPhone bridge is single-touch.
+3. **iOS live capture**: a small Swift helper using AVFoundation/CoreMediaIO (the mechanism
    QuickTime uses), shipped as a signed helper or optional download.
-3. **Wireless pairing**: `adb pair` flow with a code, QR for iOS.
-4. **Accessibility/UIAutomator** tree for app-aware actions ("tap the third tab").
-5. **Remote catalog**: a signed manifest with verified IDs and per-region store links.
+4. **Wireless pairing**: `adb pair` flow with a code, QR for iOS.
+5. **Accessibility/UIAutomator** tree for app-aware actions ("tap the third tab").
+6. **Remote catalog**: a signed manifest with verified IDs and per-region store links.

@@ -25,7 +25,16 @@ import type {
   Settings,
   ToolStatus,
 } from '../../shared/types';
+import {
+  BUILTIN_PHONE_MODELS,
+  DEFAULT_ANDROID_MODEL_ID,
+  DEFAULT_IOS_MODEL_ID,
+  defaultPhoneModel,
+  makeCustomModel,
+} from '../../shared/phone-models';
+import type { NewPhoneModel, PhoneModel } from '../../shared/types';
 import { AdbClient, AdbError, prettyPackageName } from './adb';
+import { ScrcpyControl } from './scrcpy-control';
 import { DemoDevice, DEMO_HEIGHT, DEMO_WIDTH } from './demo';
 import { IosBridge } from './ios';
 
@@ -36,6 +45,9 @@ const DEFAULT_SETTINGS: Settings = {
   adbPath: '',
   demoPlatform: 'android',
   reduceMotion: false,
+  customModels: [],
+  defaultAndroidModelId: DEFAULT_ANDROID_MODEL_ID,
+  defaultIosModelId: DEFAULT_IOS_MODEL_ID,
 };
 
 const KEYCODES: Record<KeyAction, number> = {
@@ -59,8 +71,8 @@ export class DeviceManager {
   private readonly adb: AdbClient;
   private readonly ios = new IosBridge();
   private readonly demos: Record<PhonePlatform, DemoDevice> = {
-    android: new DemoDevice('android'),
-    ios: new DemoDevice('ios'),
+    android: new DemoDevice('android', defaultPhoneModel('android')),
+    ios: new DemoDevice('ios', defaultPhoneModel('ios')),
   };
 
   private devices: DeviceInfo[] = [];
@@ -91,6 +103,9 @@ export class DeviceManager {
   private lastDeviceSignature = '';
   private pendingInstall: { deviceId: string; appId: string; startedAt: number } | null = null;
   private iosPointSizes = new Map<string, { width: number; height: number }>();
+  private androidControl: ScrcpyControl | null = null;
+  private controlAttemptSerial: string | null = null;
+  private demoGestureNotices = new Map<string, number>();
 
   constructor(private readonly options: ManagerOptions) {
     this.adb = new AdbClient(() => this.settings.adbPath);
@@ -98,11 +113,14 @@ export class DeviceManager {
 
   async init(): Promise<void> {
     await this.loadSettings();
+    // Apply persisted demo models before discovery builds the device list.
+    this.applyDefaultModels();
     // The adb client resolves its binary at construction time; re-resolve now
     // that persisted settings (including a custom path) are available.
     this.adb.refreshPath();
     this.detectTools();
     await this.refreshDevices({ initial: true });
+    this.syncControlSession();
     this.log('info', 'PhoneExplorer ready. Looking for devices…');
     if (!this.activeId) {
       await this.selectDevice(`demo-${this.settings.demoPlatform}`);
@@ -115,6 +133,8 @@ export class DeviceManager {
   }
 
   dispose(): void {
+    void this.androidControl?.stop();
+    this.androidControl = null;
     for (const timer of [
       this.engineTimer,
       this.pollTimer,
@@ -139,6 +159,11 @@ export class DeviceManager {
       activeDeviceId: this.activeId,
       installed: this.installed,
       catalog: CATALOG,
+      models: this.allModels(),
+      defaultModels: {
+        android: this.settings.defaultAndroidModelId,
+        ios: this.settings.defaultIosModelId,
+      },
       activity: this.activity,
       preview: {
         active: this.previewActive,
@@ -205,12 +230,50 @@ export class DeviceManager {
     try {
       const raw = await fs.readFile(this.settingsPath, 'utf8');
       const parsed = JSON.parse(raw) as Partial<Settings>;
+      const customModels = Array.isArray(parsed.customModels)
+        ? parsed.customModels
+            .filter((model): model is PhoneModel => isStoredModel(model))
+            .slice(0, 40)
+            .map((model) => ({
+              ...model,
+              builtin: false,
+              year: Number(model.year) || new Date().getFullYear(),
+            }))
+        : [];
       this.settings = {
         ...DEFAULT_SETTINGS,
         ...parsed,
         fps: clamp(Number(parsed.fps ?? DEFAULT_SETTINGS.fps), 1, 10),
         quality: clamp(Number(parsed.quality ?? DEFAULT_SETTINGS.quality), 40, 95),
+        demoPlatform: parsed.demoPlatform === 'ios' ? 'ios' : 'android',
+        customModels,
+        defaultAndroidModelId:
+          typeof parsed.defaultAndroidModelId === 'string'
+            ? parsed.defaultAndroidModelId
+            : DEFAULT_ANDROID_MODEL_ID,
+        defaultIosModelId:
+          typeof parsed.defaultIosModelId === 'string'
+            ? parsed.defaultIosModelId
+            : DEFAULT_IOS_MODEL_ID,
       };
+      const available = [...BUILTIN_PHONE_MODELS, ...customModels];
+      if (
+        !available.some(
+          (model) =>
+            model.id === this.settings.defaultAndroidModelId &&
+            model.platform === 'android',
+        )
+      ) {
+        this.settings.defaultAndroidModelId = DEFAULT_ANDROID_MODEL_ID;
+      }
+      if (
+        !available.some(
+          (model) =>
+            model.id === this.settings.defaultIosModelId && model.platform === 'ios',
+        )
+      ) {
+        this.settings.defaultIosModelId = DEFAULT_IOS_MODEL_ID;
+      }
     } catch {
       this.settings = { ...DEFAULT_SETTINGS };
     }
@@ -223,6 +286,153 @@ export class DeviceManager {
     } catch (error) {
       this.log('warn', 'Could not save settings', error instanceof Error ? error.message : String(error));
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Demo hardware profiles
+  // -------------------------------------------------------------------------
+
+  private allModels(): PhoneModel[] {
+    return [
+      ...BUILTIN_PHONE_MODELS,
+      ...this.settings.customModels.filter((model) => !model.builtin),
+    ];
+  }
+
+  private modelById(modelId: string, platform: PhonePlatform): PhoneModel | null {
+    return (
+      this.allModels().find((model) => model.id === modelId && model.platform === platform) ??
+      null
+    );
+  }
+
+  private defaultModelFor(platform: PhonePlatform): PhoneModel {
+    const modelId =
+      platform === 'ios'
+        ? this.settings.defaultIosModelId
+        : this.settings.defaultAndroidModelId;
+    return this.modelById(modelId, platform) ?? defaultPhoneModel(platform);
+  }
+
+  private applyDefaultModels(): void {
+    this.demos.android.setModel(this.defaultModelFor('android'));
+    this.demos.ios.setModel(this.defaultModelFor('ios'));
+  }
+
+  private syncDemoInfo(platform: PhonePlatform): void {
+    const info = this.demos[platform].info();
+    const index = this.devices.findIndex((device) => device.id === info.id);
+    if (index >= 0) this.devices[index] = info;
+    else if (this.devices.length > 0) this.devices.push(info);
+    this.lastDeviceSignature = '';
+  }
+
+  async selectDemoModel(platform: PhonePlatform, modelId: string): Promise<AppState> {
+    const model = this.modelById(modelId, platform);
+    if (!model) throw new Error('That phone model is not available for this platform.');
+    this.demos[platform].setModel(model);
+    this.installs = {};
+    this.syncDemoInfo(platform);
+    this.log(
+      'device',
+      `Demo ${platform === 'ios' ? 'iPhone' : 'Android'} is now ${model.name}`,
+      `${model.manufacturer} · ${model.osVersion} · ${model.screen.width}×${model.screen.height}`,
+    );
+    const demoId = `demo-${platform}`;
+    if (this.activeId !== demoId) {
+      await this.selectDevice(demoId);
+    } else {
+      this.lastDemoHash = '';
+      if (this.previewActive) this.sendDemoFrame(true);
+      this.emitState();
+    }
+    return this.getState();
+  }
+
+  async setDefaultModel(platform: PhonePlatform, modelId: string): Promise<AppState> {
+    const model = this.modelById(modelId, platform);
+    if (!model) throw new Error('That phone model is not available for this platform.');
+    const key = platform === 'ios' ? 'defaultIosModelId' : 'defaultAndroidModelId';
+    this.settings = { ...this.settings, [key]: modelId };
+    await this.saveSettings();
+    this.log(
+      'success',
+      `Default ${platform === 'ios' ? 'iPhone' : 'Android'} demo: ${model.name}`,
+      'Used whenever the demo lab starts on this platform.',
+    );
+    this.toast(
+      'success',
+      `Default ${platform === 'ios' ? 'iPhone' : 'Android'} updated`,
+      model.name,
+    );
+    this.emitState();
+    return this.getState();
+  }
+
+  async addPhoneModel(input: NewPhoneModel): Promise<AppState> {
+    if (this.settings.customModels.length >= 40) {
+      throw new Error('You can save up to 40 custom phone models.');
+    }
+    const normalized = normalizeNewModel(input);
+    const model = makeCustomModel(normalized, this.allModels());
+    this.settings = {
+      ...this.settings,
+      customModels: [...this.settings.customModels, model],
+      ...(model.platform === 'ios'
+        ? { defaultIosModelId: model.id }
+        : { defaultAndroidModelId: model.id }),
+    };
+    this.demos[model.platform].setModel(model);
+    this.syncDemoInfo(model.platform);
+    await this.saveSettings();
+    if (this.activeId === `demo-${model.platform}`) {
+      this.installs = {};
+      this.lastDemoHash = '';
+      if (this.previewActive) this.sendDemoFrame(true);
+    }
+    this.log('device', `Custom model added: ${model.name}`, `${model.manufacturer} · ${model.osVersion}`);
+    this.toast(
+      'success',
+      `${model.name} added`,
+      `Saved as the default ${model.platform === 'ios' ? 'iPhone' : 'Android'} demo.`,
+    );
+    this.emitState();
+    return this.getState();
+  }
+
+  async deletePhoneModel(modelId: string): Promise<AppState> {
+    const model = this.settings.customModels.find((candidate) => candidate.id === modelId);
+    if (!model) throw new Error('Only custom phone models can be deleted.');
+    const platform = model.platform;
+    this.settings = {
+      ...this.settings,
+      customModels: this.settings.customModels.filter((candidate) => candidate.id !== modelId),
+      ...(platform === 'ios'
+        ? {
+            defaultIosModelId:
+              this.settings.defaultIosModelId === modelId
+                ? DEFAULT_IOS_MODEL_ID
+                : this.settings.defaultIosModelId,
+          }
+        : {
+            defaultAndroidModelId:
+              this.settings.defaultAndroidModelId === modelId
+                ? DEFAULT_ANDROID_MODEL_ID
+                : this.settings.defaultAndroidModelId,
+          }),
+    };
+    if (this.demos[platform].info().modelId === modelId) {
+      this.demos[platform].setModel(this.defaultModelFor(platform));
+      this.installs = {};
+      this.syncDemoInfo(platform);
+      this.lastDemoHash = '';
+      if (this.activeId === `demo-${platform}` && this.previewActive) this.sendDemoFrame(true);
+    }
+    await this.saveSettings();
+    this.log('warn', `Custom model removed: ${model.name}`);
+    this.toast('info', `${model.name} removed`);
+    this.emitState();
+    return this.getState();
   }
 
   async updateSetting<K extends keyof Settings>(key: K, value: Settings[K]): Promise<AppState> {
@@ -315,6 +525,7 @@ export class DeviceManager {
               resolution: details.resolution,
               battery: details.battery,
               isDemo: false,
+              controlEngine: 'adb',
               capabilities: {
                 mirror: true,
                 input: true,
@@ -354,6 +565,7 @@ export class DeviceManager {
             resolution,
             battery: device.battery,
             isDemo: false,
+            controlEngine: this.ios.canTap ? 'idb' : undefined,
             capabilities: {
               mirror: this.ios.canScreenshot,
               input: this.ios.canTap,
@@ -398,6 +610,8 @@ export class DeviceManager {
         this.activeId = null;
       }
     }
+
+    this.syncControlSession();
 
     if (previousRealCount === 0 && real.length > 0 && previousActive?.startsWith('demo-')) {
       const first = real.find((device) => device.status === 'online');
@@ -457,6 +671,7 @@ export class DeviceManager {
       return this.getState();
     }
     if (this.previewActive) await this.stopPreview();
+    await this.stopControlSession();
     this.activeId = device.id;
     this.installed = [];
     this.installedSignature = '';
@@ -477,6 +692,7 @@ export class DeviceManager {
     if (this.settings.autoPreview && device.capabilities.mirror) {
       await this.startPreview();
     }
+    this.syncControlSession();
     return this.getState();
   }
 
@@ -770,8 +986,128 @@ export class DeviceManager {
   }
 
   // -------------------------------------------------------------------------
+  // Native control session
+  // -------------------------------------------------------------------------
+
+  private scrcpyServerPath(): string {
+    return app.isPackaged
+      ? join(process.resourcesPath, 'scrcpy-server')
+      : join(app.getAppPath(), 'vendor', 'scrcpy-server');
+  }
+
+  private demoGestureNotice(kind: string, title: string, body: string): void {
+    const now = Date.now();
+    if (now - (this.demoGestureNotices.get(kind) ?? 0) < 2500) return;
+    this.demoGestureNotices.set(kind, now);
+    this.toast('info', title, body);
+  }
+
+  private setControlEngine(deviceId: string, engine: 'scrcpy' | 'adb' | 'idb' | 'demo'): void {
+    const device = this.devices.find((candidate) => candidate.id === deviceId);
+    if (device && device.controlEngine !== engine) {
+      device.controlEngine = engine;
+      this.emitState();
+    }
+  }
+
+  private async stopControlSession(): Promise<void> {
+    this.controlAttemptSerial = null;
+    const session = this.androidControl;
+    this.androidControl = null;
+    if (session) {
+      const device = this.devices.find(
+        (candidate) => !candidate.isDemo && candidate.serial === session.deviceSerial,
+      );
+      if (device) this.setControlEngine(device.id, 'adb');
+      await session.stop().catch(() => undefined);
+    }
+  }
+
+  private syncControlSession(): void {
+    const device = this.activeDevice;
+    if (!device || device.isDemo || device.platform !== 'android' || device.status !== 'online') {
+      void this.stopControlSession();
+      return;
+    }
+    if (this.controlAttemptSerial === device.serial && this.androidControl) {
+      if (this.androidControl.ready) this.setControlEngine(device.id, 'scrcpy');
+      return;
+    }
+    // A failed session is not retried every poll; re-selecting the device is
+    // the explicit retry.
+    this.controlAttemptSerial = device.serial;
+    const session = this.androidControl ?? new ScrcpyControl({
+      serverPath: this.scrcpyServerPath(),
+      onLog: (message) => {
+        if (/error|fail|exception|denied/i.test(message)) {
+          this.log('warn', 'scrcpy control', message);
+        }
+      },
+      onExit: () => {
+        if (this.activeId === device.id) this.setControlEngine(device.id, 'adb');
+      },
+    });
+    this.androidControl = session;
+    const width = device.resolution?.width ?? 1080;
+    const height = device.resolution?.height ?? 2400;
+    void session
+      .start(device.serial, width, height)
+      .then(() => {
+        if (this.activeId !== device.id || this.androidControl !== session) {
+          void session.stop();
+          return;
+        }
+        this.setControlEngine(device.id, 'scrcpy');
+        this.log(
+          'success',
+          'Multi-touch control ready',
+          'scrcpy 3.3.3 · pinch, scroll, drag and long-press enabled',
+        );
+      })
+      .catch((error) => {
+        if (this.androidControl !== session || this.activeId !== device.id) return;
+        this.setControlEngine(device.id, 'adb');
+        this.log(
+          'warn',
+          'Multi-touch control unavailable',
+          `${messageOf(error)} · basic adb touch remains active`,
+        );
+      });
+  }
+
+  // -------------------------------------------------------------------------
   // Input
   // -------------------------------------------------------------------------
+
+  private gestureSize(device: DeviceInfo): { width: number; height: number } {
+    // scrcpy coordinates are device pixels. The preview frame may be resized
+    // (720 px wide) or rotated, so never use its pixel dimensions here.
+    let width = device.resolution?.width ?? this.frameSize?.width ?? 1080;
+    let height = device.resolution?.height ?? this.frameSize?.height ?? 2400;
+    if (this.frameSize && this.frameSize.width > this.frameSize.height && width < height) {
+      [width, height] = [height, width];
+    }
+    return { width, height };
+  }
+
+  private inputSize(device: DeviceInfo): { width: number; height: number } {
+    if (device.platform === 'ios') {
+      const points = this.iosPointSizes.get(device.serial);
+      if (points) {
+        if (this.frameSize && this.frameSize.width > this.frameSize.height && points.width < points.height) {
+          return { width: points.height, height: points.width };
+        }
+        return points;
+      }
+      if (this.frameSize) {
+        return {
+          width: Math.round(this.frameSize.width / 3),
+          height: Math.round(this.frameSize.height / 3),
+        };
+      }
+    }
+    return this.gestureSize(device);
+  }
 
   private toDevicePoint(
     nx: number,
@@ -809,17 +1145,140 @@ export class DeviceManager {
       return;
     }
     const point = this.toDevicePoint(nx, ny);
+    const size = this.gestureSize(device);
     try {
       if (device.isDemo) {
         const demo = this.activeDemo;
         if (demo?.tap(point.x, point.y)) this.sendDemoFrame(true);
       } else if (device.platform === 'android') {
-        await this.adb.tap(device.serial, point.x, point.y);
+        if (this.androidControl?.ready) {
+          await this.androidControl.tap(point.x, point.y, size.width, size.height);
+        } else {
+          await this.adb.tap(device.serial, point.x, point.y);
+        }
       } else {
         await this.ios.tap(device.serial, point.x, point.y);
       }
     } catch (error) {
       this.toast('error', 'Tap failed', messageOf(error));
+    }
+  }
+
+  async longPress(nx: number, ny: number, durationMs = 700): Promise<void> {
+    const device = this.activeDevice;
+    if (!device || !device.capabilities.input) return;
+    if (device.isDemo) {
+      this.demoGestureNotice(
+        'longpress',
+        'Long-press is not simulated',
+        'The demo screen is static; connect a phone for native gestures.',
+      );
+      return;
+    }
+    const point = this.toDevicePoint(nx, ny);
+    const size = this.gestureSize(device);
+    try {
+      if (device.platform === 'android' && this.androidControl?.ready) {
+        await this.androidControl.longPress(point.x, point.y, size.width, size.height, durationMs);
+      } else if (device.platform === 'android') {
+        await this.adb.swipe(device.serial, point.x, point.y, point.x, point.y, durationMs);
+      } else {
+        await this.ios.swipe(device.serial, point.x, point.y, point.x, point.y, durationMs);
+      }
+    } catch (error) {
+      this.toast('error', 'Long press failed', messageOf(error));
+    }
+  }
+
+  async scroll(nx: number, ny: number, deltaX: number, deltaY: number): Promise<void> {
+    const device = this.activeDevice;
+    if (!device || !device.capabilities.input) return;
+    if (device.isDemo) {
+      this.demoGestureNotice(
+        'scroll',
+        'Demo screens are static',
+        'Scroll and pinch run on the real phone; the demo has no scrollable surface.',
+      );
+      return;
+    }
+    const androidSize = this.gestureSize(device);
+    const size = this.inputSize(device);
+    const point = this.toDevicePoint(nx, ny);
+    try {
+      if (device.platform === 'android' && this.androidControl?.ready) {
+        await this.androidControl.scroll(
+          point.x,
+          point.y,
+          deltaX,
+          deltaY,
+          androidSize.width,
+          androidSize.height,
+        );
+        return;
+      }
+      const distance = clamp(Math.max(Math.abs(deltaX), Math.abs(deltaY)) * 0.8, 50, 420);
+      let x1 = point.x;
+      let y1 = point.y;
+      let x2 = point.x;
+      let y2 = point.y;
+      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+        const direction = deltaY >= 0 ? 1 : -1;
+        y1 = clamp(point.y + (direction * distance) / 2, 1, size.height - 2);
+        y2 = clamp(point.y - (direction * distance) / 2, 1, size.height - 2);
+      } else {
+        const direction = deltaX >= 0 ? 1 : -1;
+        x1 = clamp(point.x + (direction * distance) / 2, 1, size.width - 2);
+        x2 = clamp(point.x - (direction * distance) / 2, 1, size.width - 2);
+      }
+      if (device.platform === 'android') {
+        await this.adb.swipe(device.serial, x1, y1, x2, y2, 180);
+      } else {
+        await this.ios.swipe(device.serial, x1, y1, x2, y2, 180);
+      }
+    } catch (error) {
+      this.toast('error', 'Scroll failed', messageOf(error));
+    }
+  }
+
+  async pinch(nx: number, ny: number, scale: number): Promise<void> {
+    const device = this.activeDevice;
+    if (!device) return;
+    if (device.isDemo) {
+      this.demoGestureNotice(
+        'pinch',
+        'Pinch is not simulated',
+        'Multi-touch pinch runs on a real Android phone through scrcpy.',
+      );
+      return;
+    }
+    if (device.platform !== 'android') {
+      this.toast(
+        'info',
+        'Pinch needs Android multi-touch',
+        'The iPhone bridge injects single touch only; pinch requires WebDriverAgent.',
+      );
+      return;
+    }
+    if (!this.androidControl?.ready) {
+      this.toast(
+        'error',
+        'Multi-touch control is not ready',
+        'Check Activity for the scrcpy session, then re-select the phone to retry.',
+      );
+      return;
+    }
+    const point = this.toDevicePoint(nx, ny);
+    const size = this.gestureSize(device);
+    try {
+      await this.androidControl.pinch(
+        point.x,
+        point.y,
+        clamp(scale, 0.25, 4),
+        size.width,
+        size.height,
+      );
+    } catch (error) {
+      this.toast('error', 'Pinch failed', messageOf(error));
     }
   }
 
@@ -834,11 +1293,24 @@ export class DeviceManager {
     if (!device || !device.capabilities.input) return;
     const start = this.toDevicePoint(x1, y1);
     const end = this.toDevicePoint(x2, y2);
+    const size = this.gestureSize(device);
     try {
       if (device.isDemo) {
         this.log('info', 'Swipe simulated', 'Demo content has no scroll physics yet.');
       } else if (device.platform === 'android') {
-        await this.adb.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
+        if (this.androidControl?.ready) {
+          await this.androidControl.swipe(
+            [
+              { x: start.x, y: start.y },
+              { x: end.x, y: end.y },
+            ],
+            size.width,
+            size.height,
+            durationMs,
+          );
+        } else {
+          await this.adb.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
+        }
       } else {
         await this.ios.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
       }
@@ -856,10 +1328,33 @@ export class DeviceManager {
       return;
     }
     if (device.platform === 'ios') {
-      if (key === 'home') {
-        this.log('info', 'Home button', 'Use the iPhone’s side button; iOS does not expose Home to idb.');
-      } else {
-        this.toast('info', 'Not available on iPhone', 'iOS does not expose hardware buttons to this bridge.');
+      const size = this.inputSize(device);
+      try {
+        if (key === 'home') {
+          // Modern iPhones expose Home as an upward swipe from the bottom edge.
+          await this.ios.swipe(
+            device.serial,
+            size.width / 2,
+            size.height * 0.985,
+            size.width / 2,
+            size.height * 0.58,
+            220,
+          );
+        } else if (key === 'back') {
+          // There is no hardware Back; the system gesture is a left-edge swipe.
+          await this.ios.swipe(
+            device.serial,
+            Math.max(2, size.width * 0.015),
+            size.height / 2,
+            size.width * 0.42,
+            size.height / 2,
+            200,
+          );
+        } else {
+          this.toast('info', 'Not available on iPhone', 'iOS does not expose hardware buttons to this bridge.');
+        }
+      } catch (error) {
+        this.toast('error', 'iPhone gesture failed', messageOf(error));
       }
       return;
     }
@@ -1234,6 +1729,65 @@ export class DeviceManager {
 function messageOf(error: unknown): string {
   if (error instanceof AdbError) return error.message || 'adb error';
   return error instanceof Error ? error.message : String(error);
+}
+
+function isStoredModel(value: unknown): value is PhoneModel {
+  if (!value || typeof value !== 'object') return false;
+  const model = value as Partial<PhoneModel>;
+  const screen = model.screen as { width?: unknown; height?: unknown } | undefined;
+  return (
+    typeof model.id === 'string' &&
+    model.id.startsWith('custom-') &&
+    (model.platform === 'android' || model.platform === 'ios') &&
+    typeof model.name === 'string' &&
+    model.name.trim().length > 0 &&
+    typeof model.manufacturer === 'string' &&
+    typeof model.osVersion === 'string' &&
+    typeof model.frameColor === 'string' &&
+    /^#[0-9a-f]{6}$/i.test(model.frameColor) &&
+    typeof model.displayInches === 'number' &&
+    model.displayInches > 2 &&
+    model.displayInches < 15 &&
+    Boolean(screen) &&
+    Number.isFinite(Number(screen?.width)) &&
+    Number.isFinite(Number(screen?.height)) &&
+    Number(screen?.width) >= 200 &&
+    Number(screen?.width) <= 6000 &&
+    Number(screen?.height) >= 200 &&
+    Number(screen?.height) <= 6000
+  );
+}
+
+function normalizeNewModel(input: NewPhoneModel): NewPhoneModel {
+  const platform: PhonePlatform = input.platform === 'ios' ? 'ios' : 'android';
+  const name = String(input.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 48);
+  const manufacturer = String(input.manufacturer ?? '').trim().slice(0, 32);
+  const osVersion = String(input.osVersion ?? '').trim().slice(0, 20);
+  const width = Math.round(Number(input.screen?.width));
+  const height = Math.round(Number(input.screen?.height));
+  const displayInches = Number(input.displayInches);
+  const frameColor = /^#[0-9a-f]{6}$/i.test(String(input.frameColor))
+    ? String(input.frameColor)
+    : '#8b8f96';
+  if (!name) throw new Error('Give the phone model a name.');
+  if (!Number.isFinite(width) || width < 320 || width > 5000) {
+    throw new Error('Screen width must be between 320 and 5000 pixels.');
+  }
+  if (!Number.isFinite(height) || height < 480 || height > 5000) {
+    throw new Error('Screen height must be between 480 and 5000 pixels.');
+  }
+  if (!Number.isFinite(displayInches) || displayInches < 3 || displayInches > 12) {
+    throw new Error('Screen size must be between 3 and 12 inches.');
+  }
+  return {
+    platform,
+    name,
+    manufacturer: manufacturer || (platform === 'ios' ? 'Apple' : 'Custom'),
+    osVersion: osVersion || (platform === 'ios' ? '26' : '16'),
+    screen: { width, height },
+    displayInches: Math.round(displayInches * 100) / 100,
+    frameColor,
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {

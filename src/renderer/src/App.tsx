@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { CatalogApp } from '@shared/types';
+import type { CatalogApp, PhonePlatform } from '@shared/types';
 import { usePhone } from './hooks/usePhone';
 import { DeviceRail } from './components/DeviceRail';
 import { Inspector, type InspectorTab } from './components/Inspector';
 import { AppSheet, ConnectSheet, QrSheet, SettingsSheet } from './components/Modals';
+import { ModelsSheet } from './components/ModelsSheet';
+import { GesturesSheet } from './components/GesturesSheet';
 import { Stage } from './components/Stage';
 import { TitleBar } from './components/TitleBar';
 import { Toasts } from './components/Toasts';
@@ -74,7 +76,25 @@ export default function App(): React.ReactElement {
   const [connectOpen, setConnectOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [peekApp, setPeekApp] = useState<CatalogApp | null>(null);
+  const [modelsFor, setModelsFor] = useState<PhonePlatform | null>(null);
+  const [modelsReturnToSettings, setModelsReturnToSettings] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+
+  const openModels = (platform: PhonePlatform): void => {
+    setModelsReturnToSettings(settingsOpen);
+    setSettingsOpen(false);
+    setConnectOpen(false);
+    setModelsFor(platform);
+  };
+
+  const closeModels = (): void => {
+    setModelsFor(null);
+    if (modelsReturnToSettings) {
+      setModelsReturnToSettings(false);
+      setSettingsOpen(true);
+    }
+  };
 
   useEffect(() => {
     return window.phone.onNavigate((view) => {
@@ -87,6 +107,7 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const mod = event.metaKey || event.ctrlKey;
+      if (modelsFor || settingsOpen || connectOpen || peekApp || guideOpen || state?.qr) return;
       if (mod && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setTab('discover');
@@ -107,13 +128,13 @@ export default function App(): React.ReactElement {
         event.preventDefault();
         setTab('activity');
       }
-      if (event.key === 'Escape' && focusMode && !connectOpen && !settingsOpen && !peekApp && !state?.qr) {
+      if (event.key === 'Escape' && focusMode && !connectOpen && !settingsOpen && !peekApp && !modelsFor && !guideOpen && !state?.qr) {
         setFocusMode(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focusMode, connectOpen, settingsOpen, peekApp, state?.qr]);
+  }, [focusMode, connectOpen, settingsOpen, peekApp, modelsFor, guideOpen, state?.qr]);
 
   if (!state) return <BootScreen />;
 
@@ -144,6 +165,7 @@ export default function App(): React.ReactElement {
             actions={actions}
             onOpenConnect={() => setConnectOpen(true)}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenModels={openModels}
           />
         ) : null}
 
@@ -154,6 +176,7 @@ export default function App(): React.ReactElement {
           actions={actions}
           focusMode={focusMode}
           onToggleFocus={() => setFocusMode((value) => !value)}
+          onOpenGuide={() => setGuideOpen(true)}
         />
 
         {!focusMode ? (
@@ -182,7 +205,23 @@ export default function App(): React.ReactElement {
         <ConnectSheet state={state} actions={actions} onClose={() => setConnectOpen(false)} />
       ) : null}
       {settingsOpen ? (
-        <SettingsSheet state={state} actions={actions} onClose={() => setSettingsOpen(false)} />
+        <SettingsSheet
+          state={state}
+          actions={actions}
+          onClose={() => setSettingsOpen(false)}
+          onOpenModels={openModels}
+        />
+      ) : null}
+      {modelsFor ? (
+        <ModelsSheet
+          initialPlatform={modelsFor}
+          state={state}
+          actions={actions}
+          onClose={closeModels}
+        />
+      ) : null}
+      {guideOpen ? (
+        <GesturesSheet state={state} onClose={() => setGuideOpen(false)} />
       ) : null}
       {state.qr ? (
         <QrSheet qr={state.qr} actions={actions} onClose={() => void actions.hideQr()} />
