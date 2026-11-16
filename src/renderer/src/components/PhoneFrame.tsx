@@ -33,11 +33,29 @@ export function PhoneFrame({
   const point = (clientX: number, clientY: number) => {
     const rect = screenRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return null;
+    // The screenshot is letterboxed by object-fit: contain. Map the pointer to
+    // the image content, not the black bars around it.
+    const imageAspect = (frame?.width ?? 402) / (frame?.height ?? 874);
+    const boxAspect = rect.width / rect.height;
+    let drawWidth = rect.width;
+    let drawHeight = rect.height;
+    let offsetX = 0;
+    let offsetY = 0;
+    if (imageAspect > boxAspect) {
+      drawHeight = rect.width / imageAspect;
+      offsetY = (rect.height - drawHeight) / 2;
+    } else {
+      drawWidth = rect.height * imageAspect;
+      offsetX = (rect.width - drawWidth) / 2;
+    }
+    const localX = clientX - rect.left - offsetX;
+    const localY = clientY - rect.top - offsetY;
+    if (localX < 0 || localY < 0 || localX > drawWidth || localY > drawHeight) return null;
     return {
       x: clientX - rect.left,
       y: clientY - rect.top,
-      nx: (clientX - rect.left) / rect.width,
-      ny: (clientY - rect.top) / rect.height,
+      nx: localX / drawWidth,
+      ny: localY / drawHeight,
     };
   };
 
