@@ -1,5 +1,7 @@
 # PhoneExplorer
 
+[![CI](https://github.com/DansiDanutz/PhoneExplorer/actions/workflows/ci.yml/badge.svg)](https://github.com/DansiDanutz/PhoneExplorer/actions/workflows/ci.yml)
+
 **Stage 01 — a desktop bridge for your phone.**
 
 PhoneExplorer puts an Android phone or iPhone on your desktop: a near-live screen, the
