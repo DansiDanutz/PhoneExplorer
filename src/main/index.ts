@@ -20,6 +20,7 @@ import type {
   Settings,
 } from '../shared/types';
 import { DeviceManager } from './services/manager';
+import { startMcpBridge, type BridgeHandle } from './bridge';
 
 const isDev = !app.isPackaged;
 
@@ -42,6 +43,7 @@ if (!gotLock) {
 
 let mainWindow: BrowserWindow | null = null;
 let manager: DeviceManager | null = null;
+let mcpBridge: BridgeHandle | null = null;
 
 function argValue(flag: string): string | null {
   const index = process.argv.indexOf(flag);
@@ -308,6 +310,11 @@ app.whenReady().then(async () => {
 
   mainWindow = createWindow();
   const instance = wireManager();
+  try {
+    mcpBridge = await startMcpBridge({ manager: instance });
+  } catch (error) {
+    console.error('[mcp-bridge] could not start', error);
+  }
   registerIpc(instance);
   buildMenu();
 
@@ -344,5 +351,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  void mcpBridge?.close();
+  mcpBridge = null;
   manager?.dispose();
 });

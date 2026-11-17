@@ -236,6 +236,13 @@ Open-source survey and design rationale: [docs/RESEARCH.md](docs/RESEARCH.md).
 
 ---
 
+## MCP bridge
+
+PhoneExplorer can be driven from Codex, Claude Code, DeepSeek or any MCP client
+through the local authenticated bridge and companion server. Start the app, then
+point the harness at `mcp/server.mjs`. See [docs/MCP.md](docs/MCP.md) for the
+three harness configs, the 15 tools and the security model.
+
 ## Development
 
 ```bash

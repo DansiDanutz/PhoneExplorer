@@ -14,6 +14,8 @@ extraResources:
     to: scrcpy-server
   - from: vendor/LICENSE.scrcpy
     to: LICENSE.scrcpy
+  - from: mcp
+    to: mcp
 electronDist: node_modules/electron/dist
 mac:
   category: public.app-category.developer-tools
