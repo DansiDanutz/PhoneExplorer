@@ -173,6 +173,14 @@ export interface ManagerOptions {
   broadcast: (event: ServerEvent) => void;
 }
 
+function dayFolder(date = new Date()): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 export class DeviceManager {
   private readonly adb: AdbClient;
   private readonly ios = new IosBridge();
@@ -1288,25 +1296,41 @@ export class DeviceManager {
   }
 
   async listScreenshots(): Promise<Screenshot[]> {
-    const dir = await this.ensureScreenshotDir();
-    const entries = await fs.readdir(dir).catch(() => []);
-    const index = await this.readScreenshotIndex(dir);
+    const root = await this.ensureScreenshotDir();
+    const index = await this.readScreenshotIndex(root);
     const byId = new Map(index.items.map((item) => [item.id, item]));
+    const files: Array<{ id: string; path: string; stat: import('node:fs').Stats }> = [];
+    const rootEntries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+    for (const entry of rootEntries) {
+      if (entry.isFile() && /\.png$/i.test(entry.name)) {
+        if (!/^[A-Za-z0-9._-]+\.png$/i.test(entry.name)) continue;
+        const path = join(root, entry.name);
+        const stat = await fs.stat(path).catch(() => null);
+        if (stat?.isFile()) files.push({ id: entry.name, path, stat });
+        continue;
+      }
+      if (entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name)) {
+        const dated = await fs.readdir(join(root, entry.name)).catch(() => []);
+        for (const name of dated) {
+          if (!/\.png$/i.test(name) || !/^[A-Za-z0-9._-]+\.png$/i.test(name)) continue;
+          const id = `${entry.name}/${name}`;
+          const path = join(root, id);
+          const stat = await fs.stat(path).catch(() => null);
+          if (stat?.isFile()) files.push({ id, path, stat });
+        }
+      }
+    }
     const shots: Screenshot[] = [];
-    for (const file of entries.filter((name) => /\.png$/i.test(name)).slice(0, 120)) {
-      if (!/^[A-Za-z0-9._-]+\.png$/i.test(file)) continue;
-      const path = join(dir, file);
-      const stat = await fs.stat(path).catch(() => null);
-      if (!stat || !stat.isFile()) continue;
-      const meta = byId.get(file) ?? {
-        id: file,
-        createdAt: stat.mtimeMs,
+    for (const file of files.slice(0, 160)) {
+      const meta = byId.get(file.id) ?? {
+        id: file.id,
+        createdAt: file.stat.mtimeMs,
         width: 0,
         height: 0,
         deviceName: 'Phone screen',
         platform: null,
       };
-      const shot = this.screenshotFromPath(path, meta);
+      const shot = this.screenshotFromPath(file.path, meta);
       if (shot) shots.push(shot);
     }
     shots.sort((a, b) => b.createdAt - a.createdAt);
@@ -1649,8 +1673,11 @@ export class DeviceManager {
       throw new Error('The screenshot came back empty.');
     }
 
-    const dir = await this.ensureScreenshotDir();
+    const root = await this.ensureScreenshotDir();
     const now = new Date();
+    const day = dayFolder(now);
+    const dir = join(root, day);
+    await fs.mkdir(dir, { recursive: true });
     const stamp = [
       now.getFullYear(),
       String(now.getMonth() + 1).padStart(2, '0'),
@@ -1660,13 +1687,14 @@ export class DeviceManager {
       String(now.getSeconds()).padStart(2, '0'),
       String(now.getMilliseconds()).padStart(3, '0'),
     ].join('-');
-    let id = `PhoneExplorer-${stamp}.png`;
+    let file = `PhoneExplorer-${stamp}.png`;
     let suffix = 1;
-    while (await fs.stat(join(dir, id)).then(() => true).catch(() => false)) {
-      id = `PhoneExplorer-${stamp}-${suffix}.png`;
+    while (await fs.stat(join(dir, file)).then(() => true).catch(() => false)) {
+      file = `PhoneExplorer-${stamp}-${suffix}.png`;
       suffix += 1;
     }
-    const path = join(dir, id);
+    const id = `${day}/${file}`;
+    const path = join(dir, file);
     await fs.writeFile(path, image.toPNG());
     const device = this.activeDevice;
     const labelled = request.label?.trim();
@@ -1680,8 +1708,8 @@ export class DeviceManager {
       caption: request.caption?.trim() || undefined,
       group: request.group?.trim() || undefined,
     };
-    const index = await this.readScreenshotIndex(dir);
-    await this.writeScreenshotIndex(dir, [
+    const index = await this.readScreenshotIndex(root);
+    await this.writeScreenshotIndex(root, [
       meta,
       ...index.items.filter((item) => item.id !== id),
     ]);
@@ -1695,7 +1723,7 @@ export class DeviceManager {
   }
 
   private async screenshotPath(id: string): Promise<string> {
-    if (id !== basename(id) || !/^[A-Za-z0-9._-]+\.png$/i.test(id)) {
+    if (!/^(?:\d{4}-\d{2}-\d{2}\/)?[A-Za-z0-9._-]+\.png$/i.test(id)) {
       throw new Error('Invalid screenshot name.');
     }
     const dir = await this.ensureScreenshotDir();
@@ -1710,9 +1738,9 @@ export class DeviceManager {
   async deleteScreenshot(id: string): Promise<void> {
     const path = await this.screenshotPath(id);
     await fs.unlink(path);
-    const dir = await this.ensureScreenshotDir();
-    const index = await this.readScreenshotIndex(dir);
-    await this.writeScreenshotIndex(dir, index.items.filter((item) => item.id !== id));
+    const root = await this.ensureScreenshotDir();
+    const index = await this.readScreenshotIndex(root);
+    await this.writeScreenshotIndex(root, index.items.filter((item) => item.id !== id));
     this.log('info', 'Screenshot deleted', path);
   }
 
@@ -1758,7 +1786,9 @@ export class DeviceManager {
       }));
     if (sections.length === 0) throw new Error('The walkthrough has no screenshots.');
     const createdAt = Date.now();
-    const dir = await this.ensureArtefactDir();
+    const base = await this.ensureArtefactDir();
+    const dir = join(base, dayFolder(new Date(createdAt)));
+    await fs.mkdir(dir, { recursive: true });
     const doc: ArtefactDocument = {
       version: 1,
       title: input.title.slice(0, 120),
@@ -1779,48 +1809,73 @@ export class DeviceManager {
     return doc;
   }
 
+  private async artefactDirectories(base: string): Promise<string[]> {
+    const entries = await fs.readdir(base, { withFileTypes: true }).catch(() => []);
+    return [
+      base,
+      ...entries
+        .filter((entry) => entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name))
+        .map((entry) => join(base, entry.name)),
+    ];
+  }
+
   async getArtefact(): Promise<ArtefactDocument | null> {
-    const dir = await this.ensureArtefactDir();
-    try {
-      const raw = await fs.readFile(join(dir, 'artefact.json'), 'utf8');
-      const parsed = JSON.parse(raw) as Partial<ArtefactDocument>;
-      if (
-        parsed.version !== 1 ||
-        typeof parsed.title !== 'string' ||
-        typeof parsed.createdAt !== 'number' ||
-        !Array.isArray(parsed.sections)
-      ) {
-        return null;
+    const base = await this.ensureArtefactDir();
+    const dirs = await this.artefactDirectories(base);
+    let newest: ArtefactDocument | null = null;
+    for (const dir of dirs) {
+      try {
+        const raw = await fs.readFile(join(dir, 'artefact.json'), 'utf8');
+        const parsed = JSON.parse(raw) as Partial<ArtefactDocument>;
+        if (
+          parsed.version !== 1 ||
+          typeof parsed.title !== 'string' ||
+          typeof parsed.createdAt !== 'number' ||
+          !Array.isArray(parsed.sections)
+        ) {
+          continue;
+        }
+        const doc: ArtefactDocument = {
+          version: 1,
+          title: parsed.title,
+          subtitle: typeof parsed.subtitle === 'string' ? parsed.subtitle : '',
+          deviceName: typeof parsed.deviceName === 'string' ? parsed.deviceName : 'Device',
+          sections: parsed.sections.filter(
+            (section): section is ArtefactDocument['sections'][number] =>
+              Boolean(section) &&
+              typeof section.id === 'string' &&
+              typeof section.title === 'string' &&
+              typeof section.description === 'string' &&
+              typeof section.image === 'string',
+          ),
+          createdAt: parsed.createdAt,
+          folder: dir,
+        };
+        if (!newest || doc.createdAt > newest.createdAt) newest = doc;
+      } catch {
+        // Try the next dated folder.
       }
-      return {
-        version: 1,
-        title: parsed.title,
-        subtitle: typeof parsed.subtitle === 'string' ? parsed.subtitle : '',
-        deviceName: typeof parsed.deviceName === 'string' ? parsed.deviceName : 'Device',
-        sections: parsed.sections.filter(
-          (section): section is ArtefactDocument['sections'][number] =>
-            Boolean(section) &&
-            typeof section.id === 'string' &&
-            typeof section.title === 'string' &&
-            typeof section.description === 'string' &&
-            typeof section.image === 'string',
-        ),
-        createdAt: parsed.createdAt,
-        folder: dir,
-      };
-    } catch {
-      return null;
     }
+    return newest;
+  }
+
+  private async currentArtefactDir(): Promise<string> {
+    const doc = await this.getArtefact();
+    if (doc) return doc.folder;
+    const base = await this.ensureArtefactDir();
+    const dir = join(base, dayFolder());
+    await fs.mkdir(dir, { recursive: true });
+    return dir;
   }
 
   async openArtefact(): Promise<void> {
-    const dir = await this.ensureArtefactDir();
+    const dir = await this.currentArtefactDir();
     const error = await shell.openPath(join(dir, 'artefact.html'));
     if (error) throw new Error(error);
   }
 
   async revealArtefact(): Promise<void> {
-    await shell.openPath(await this.ensureArtefactDir());
+    await shell.openPath(await this.currentArtefactDir());
   }
 
   // -------------------------------------------------------------------------

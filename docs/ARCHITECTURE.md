@@ -160,16 +160,25 @@ wheel direction.
 
 `Artefacts` is the tab immediately after Library. The same recording action is available as the
 red **Record** pill directly under the neon Screenshots button on the phone margin.
-**Record an artefact** starts Android `screenrecord` on the active phone and a two-second
-`screencap` loop. The user moves the phone
-through the app; the recorder never sends a tap. Both the MP4 and the live screenshots are kept
-under `~/Pictures/PhoneExplorer/Recordings` and `~/Pictures/PhoneExplorer`.
+**Record an artefact** opens the two recording modes. **Manual** starts Android `screenrecord`
+and a two-second `screencap` loop; the user moves the phone and the recorder never taps.
+**Auto** starts the same capture, verifies GGPoker is focused, and taps its known bottom
+navigation (Lobby → Tournaments → Casino → Lobby). Both the MP4 and the live screenshots are
+kept under `~/Pictures/PhoneExplorer/Recordings` and `~/Pictures/PhoneExplorer`.
+
+Screenshots are written to `~/Pictures/PhoneExplorer/<YYYY-MM-DD>/`; artefacts are written to
+`~/Pictures/PhoneExplorer/Artefacts/<YYYY-MM-DD>/`. Existing flat screenshots remain readable,
+and `getArtefact` selects the newest dated document.
 
 On stop, the main process pulls the MP4, asks ffmpeg for scene-change keyframes (falling back
 to one frame per second for static UI), converts them to PNG, and imports them through the
 existing screenshot Library pipeline. The renderer runs Tesseract OCR, deduplicates frames by
 token overlap, names each distinct screen from its visible text, and writes the Pages-style
-document. A HUD shows elapsed time and offers **Stop recording**; the HUD is never part of the
+document.
+
+The Artefacts tab also has **Create from screenshots**: a picker lists Library shots, the chosen
+images are OCR-labelled, downscaled to page width, and saved as a dated artefact without
+touching the phone. A HUD shows elapsed time and offers **Stop recording**; the HUD is never part of the
 phone video because capture is entirely on the phone.
 
 This path requires Android `screenrecord`, ffmpeg and Tesseract. It intentionally replaces the

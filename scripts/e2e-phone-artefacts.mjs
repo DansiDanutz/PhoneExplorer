@@ -40,7 +40,7 @@ try {
   const pages = await page.locator('.artefact-page').count();
   const titles = await page.locator('.artefact-page h4').allTextContents();
   if (pages < 2) throw new Error(`expected at least 2 phone views, got ${pages}`);
-  const files = (await readdir(shotDir)).filter((f) => f.endsWith('.png'));
+  const files = (await readdir(shotDir, { recursive: true })).filter((f) => f.endsWith('.png'));
   if (files.length < pages) throw new Error('phone screenshots missing from Library');
   const videos = (await readdir(join(shotDir, 'Recordings'))).filter((f) => f.endsWith('.mp4'));
   if (videos.length === 0) throw new Error('recording video missing');

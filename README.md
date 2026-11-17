@@ -164,12 +164,16 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
   phone; PhoneExplorer never taps). When you stop, ffmpeg extracts scene/key frames, Tesseract
   labels the distinct screens, and the result is saved as phone screenshots in **Library** plus
   a Pages-style document in Artefacts. A **Stop recording** control is always available. Auto
-  walkthrough only starts when GGPoker is the focused phone app. The source MP4 is kept under
+  walkthrough only starts when GGPoker is the focused phone app. On the Artefacts tab,
+  **Create from screenshots** opens the Library picker: select any screenshots and build a
+  document without recording. Artefacts are saved under
+  `~/Pictures/PhoneExplorer/Artefacts/<date>`. The source MP4 is kept under
   `~/Pictures/PhoneExplorer/Recordings`. This requires Android `screenrecord`, `ffmpeg`, and
-  Tesseract; the previous automatic tap explorer is no longer shipped.
+  Tesseract; the previous automatic tap explorer is no longer shipped. Both recording modes and
+  the screenshot picker save into the current date folder.
 - **Screenshot** with the camera button on the phone’s right margin, or **⌘S**. Every capture
-  lands in **Library** (⌘4), where you can preview, reveal and delete it. The Library header
-  shows the exact folder; normally `~/Pictures/PhoneExplorer`.
+  lands in **Library** (⌘4), where you can preview, reveal and delete it. Captures are grouped
+  in a folder named with the current date, e.g. `~/Pictures/PhoneExplorer/2026-11-17`.
 - **Ctrl/⌘ + wheel** or the zoom buttons send a two-finger **pinch** on Android through the
   scrcpy control channel. On Android, tap, drag, scroll, long-press, Back and Home always
   use adb, so basic control does not depend on scrcpy starting.

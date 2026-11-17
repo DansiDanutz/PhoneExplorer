@@ -28,7 +28,7 @@ try {
 
   await page.locator('.phone-side--shot').click();
   await page.waitForTimeout(1200);
-  const files = (await readdir(shotDir)).filter((file) => file.endsWith('.png'));
+  const files = (await readdir(shotDir, { recursive: true })).filter((file) => file.endsWith('.png'));
   if (files.length !== 1) throw new Error(`expected one screenshot file, got ${files.length}`);
   if (!(await page.locator('.toast-copy strong').last().textContent())?.includes('Screenshot saved')) {
     throw new Error('no screenshot confirmation');
@@ -52,7 +52,7 @@ try {
   await page.locator('.modal-shot .btn.is-danger').click();
   await page.waitForTimeout(900);
   if ((await page.locator('.shot-card').count()) !== 0) throw new Error('deleted shot remains in library');
-  if ((await readdir(shotDir)).filter((file) => file.endsWith('.png')).length !== 0) {
+  if ((await readdir(shotDir, { recursive: true })).filter((file) => file.endsWith('.png')).length !== 0) {
     throw new Error('screenshot file was not deleted');
   }
   if (errors.length) throw new Error(`renderer errors: ${errors.join('; ')}`);
