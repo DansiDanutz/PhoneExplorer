@@ -156,13 +156,14 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **GGPoker / PlayGG** is in the catalog as an 18+ app. Its Get button opens the official
   Google Play listing `com.nsus.poker.prodggpcom` or App Store ID `1504833971`. The poker
   table visible in demo mode is a simulated preview, not the real app.
-- **App understanding** opens **Artefacts** (⌘5) and runs a one-click walkthrough: PhoneExplorer
-  visits every workspace tab, the search/category states, every sheet, the QR handoff and focus
-  mode, saves each view to **Library**, then lays them out as a Pages-style document with a
-  short explanation of each screen. The generated HTML can be opened or printed from the
-  Artefacts header. The capture pattern was modelled after Paper.app’s structured design
-  snapshots, inspected with REA (Paper 0.5.19 is an Electron/ASAR app; its design surface is
-  remote, so screenshots + labels + descriptions are the portable primitive).
+- **App understanding** opens **Artefacts** (⌘5). **Record an artefact** starts a native
+  Android `screenrecord` session and also captures a full-resolution phone screenshot every two
+  seconds. Move through the phone yourself — PhoneExplorer never taps the app. When you stop,
+  ffmpeg extracts scene/key frames, Tesseract labels the distinct screens, and the result is
+  saved as phone screenshots in **Library** plus a Pages-style document in Artefacts. A **Stop
+  recording** control is always available. The source MP4 is kept under
+  `~/Pictures/PhoneExplorer/Recordings`. This requires Android `screenrecord`, `ffmpeg`, and
+  Tesseract; the previous automatic tap explorer is no longer shipped.
 - **Screenshot** with the camera button on the phone’s right margin, or **⌘S**. Every capture
   lands in **Library** (⌘4), where you can preview, reveal and delete it. The Library header
   shows the exact folder; normally `~/Pictures/PhoneExplorer`.
@@ -239,7 +240,7 @@ npm run e2e          # Playwright: demo install → open → iPhone → settings
 npm run e2e:models   # model search, custom profile, defaults, delete
 npm run e2e:gestures # guide, right-click Back, scroll/pinch fallbacks
 npm run e2e:library  # screenshot button, Library preview, delete, native-resolution PNG
-npm run e2e:artefacts # one-click walkthrough, 16 pages, Library evidence, HTML document
+npm run e2e:phone-artefacts # device-only recording test (real Android, ffmpeg, Tesseract)
 npm run e2e:real     # Playwright + a fake adb: discovery, mirror, install, gestures, launch
 npm run showcase     # regenerate docs/showcase screenshots
 npm run icon        # rebuild build/icon.png + icon.icns
@@ -259,9 +260,10 @@ npm run dist        # electron-builder: dmg + zip (macOS)
   long-press on the demo.
 - **Library E2E** captures a phone-margin screenshot, checks the native 402×874 PNG, opens
   it in the Library viewer and deletes it from disk and the panel.
-- **Artefacts E2E** runs the complete walkthrough: all five workspace tabs, search, category,
-  model form, settings, connect, guide, app detail, QR, focus, Library viewer and the final
-  Artefacts page. It verifies 16 Library screenshots and the generated Pages-style HTML.
+- **Phone Artefacts E2E** is device-only: it starts a recording, moves the phone through a
+  short sequence, stops, and verifies that phone screenshots land in Library and the Pages
+  document is generated. It requires Android `screenrecord`, ffmpeg and Tesseract. CI skips it
+  because no phone is attached.
 - **Real-path E2E** points the app at `scripts/fake-adb.mjs`, a tiny adb stand-in that
   implements device discovery, screenshots, package lists, input and store deep links.
   It proves the Android pipeline without hardware: frame capture, install detection via

@@ -4423,3 +4423,96 @@ button.phone-side:focus-visible {
   font-size: 8.5px;
   line-height: 1.4;
 }
+
+/* Walkthrough progress */
+.walkthrough-hud {
+  position: fixed;
+  right: 24px;
+  bottom: 42px;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(360px, calc(100vw - 48px));
+  padding: 10px 11px;
+  border: 1px solid rgba(216, 255, 99, 0.28);
+  border-radius: 13px;
+  background: rgba(10, 13, 17, 0.94);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(16px);
+}
+
+.walkthrough-pulse {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(216, 255, 99, 0.45);
+  animation: walkthroughPulse 1.4s ease-out infinite;
+}
+
+.walkthrough-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.walkthrough-copy strong {
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.walkthrough-copy span {
+  color: var(--text-3);
+  font-size: 9px;
+}
+
+.walkthrough-stop {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 115, 115, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 80, 80, 0.1);
+  color: #ffb0b0;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.walkthrough-stop:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.18);
+}
+
+.walkthrough-stop:disabled {
+  opacity: 0.65;
+}
+
+@keyframes walkthroughPulse {
+  0% { box-shadow: 0 0 0 0 rgba(216, 255, 99, 0.4); }
+  70% { box-shadow: 0 0 0 7px rgba(216, 255, 99, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(216, 255, 99, 0); }
+}
+
+.recording-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.45);
+  animation: recordingPulse 1.3s ease-out infinite;
+}
+
+.recording-dot.is-processing {
+  background: var(--accent);
+  animation: walkthroughPulse 1.4s ease-out infinite;
+}
+
+@keyframes recordingPulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(255, 77, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+}

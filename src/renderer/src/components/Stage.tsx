@@ -173,6 +173,10 @@ export function Stage({
             onClick={onToggleFocus}
             title={focusMode ? 'Exit focus mode (Esc)' : 'Focus mode'}
             aria-label={focusMode ? 'Exit focus mode' : 'Focus mode'}
+            data-artefact-id="focus"
+            data-artefact-label="Focus mode"
+            data-artefact-kind="overlay"
+            data-artefact-description="Hide both rails and give the phone the entire workspace."
           >
             <Icon name={focusMode ? 'minimize' : 'maximize'} size={17} />
           </button>
@@ -302,6 +306,10 @@ export function Stage({
             onClick={onOpenGuide}
             title="Gesture guide"
             aria-label="Gesture guide"
+            data-artefact-id="guide"
+            data-artefact-label="Control guide"
+            data-artefact-kind="overlay"
+            data-artefact-description="How mouse, keyboard and touch gestures map onto the phone."
           >
             <Icon name="info" size={18} />
           </button>

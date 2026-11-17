@@ -5,6 +5,12 @@ import type {
   ArtefactInput,
   FramePayload,
   KeyAction,
+  LayaCandidate,
+  LayaChoice,
+  OcrBox,
+  PhoneUiNode,
+  RecordingResult,
+  RecordingStart,
   NewPhoneModel,
   PhonePlatform,
   Screenshot,
@@ -39,6 +45,16 @@ export interface PhoneActions {
   press: (key: KeyAction) => Promise<void>;
   typeText: (text: string) => Promise<void>;
   captureScreenshot: (request: ScreenshotRequest) => Promise<Screenshot | null>;
+  chooseWithLaya: (
+    state: Record<string, unknown>,
+    candidates: LayaCandidate[],
+  ) => Promise<LayaChoice | null>;
+  dumpAndroidUi: () => Promise<PhoneUiNode[]>;
+  capturePhoneScreen: (request: ScreenshotRequest) => Promise<Screenshot | null>;
+  ocrScreenshot: (id: string) => Promise<OcrBox[]>;
+  restartAndroidApp: (packageName: string) => Promise<void>;
+  startPhoneRecording: () => Promise<RecordingStart>;
+  stopPhoneRecording: () => Promise<RecordingResult>;
   saveArtefact: (input: ArtefactInput) => Promise<ArtefactDocument | null>;
   getArtefact: () => Promise<ArtefactDocument | null>;
   openArtefact: () => Promise<void>;
@@ -220,6 +236,44 @@ export function usePhone(): {
       } catch (error) {
         fail('Screenshot failed')(error);
         return null;
+      }
+    },
+    chooseWithLaya: async (state, candidates) => {
+      try {
+        return await window.phone.chooseWithLaya(state, candidates);
+      } catch (error) {
+        fail('Laya could not choose the next view')(error);
+        return null;
+      }
+    },
+    dumpAndroidUi: async () => {
+      try {
+        return await window.phone.dumpAndroidUi();
+      } catch (error) {
+        fail('Could not read the phone UI tree')(error);
+        throw error;
+      }
+    },
+    capturePhoneScreen: async (request) => {
+      try {
+        const shot = await window.phone.capturePhoneScreen(request);
+        window.dispatchEvent(new Event('phone:screenshot'));
+        return shot;
+      } catch (error) {
+        fail('Phone screenshot failed')(error);
+        return null;
+      }
+    },
+    startPhoneRecording: () => window.phone.startPhoneRecording(),
+    stopPhoneRecording: () => window.phone.stopPhoneRecording(),
+    restartAndroidApp: (packageName) =>
+      window.phone.restartAndroidApp(packageName).catch(fail('Could not restart the phone app')),
+    ocrScreenshot: async (id) => {
+      try {
+        return await window.phone.ocrScreenshot(id);
+      } catch (error) {
+        fail('Phone OCR failed')(error);
+        return [];
       }
     },
     saveArtefact: async (input) => {

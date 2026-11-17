@@ -250,6 +250,53 @@ export interface Screenshot {
   group?: string;
 }
 
+export interface OcrBox {
+  text: string;
+  confidence: number;
+  /** Normalized top-left coordinates and size. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  center: { x: number; y: number };
+}
+
+export interface PhoneUiNode {
+  id: string;
+  label: string;
+  role: string;
+  packageName: string;
+  bounds: { x: number; y: number; width: number; height: number };
+  /** Center in normalized phone coordinates (0..1). */
+  center: { x: number; y: number };
+  clickable: boolean;
+  enabled: boolean;
+  selected: boolean;
+  scrollable: boolean;
+}
+
+export interface RecordingStart {
+  startedAt: number;
+  videoPath: string;
+}
+
+export interface RecordingResult extends RecordingStart {
+  stoppedAt: number;
+  screenshots: Screenshot[];
+}
+
+export interface LayaCandidate {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface LayaChoice {
+  id: string;
+  confidence: number;
+  model?: string;
+}
+
 export interface ArtefactSection {
   id: string;
   title: string;
@@ -319,6 +366,16 @@ export interface PhoneAPI {
   pinch(x: number, y: number, scale: number): Promise<void>;
   press(key: KeyAction): Promise<void>;
   captureScreenshot(request: ScreenshotRequest): Promise<Screenshot>;
+  chooseWithLaya(
+    state: Record<string, unknown>,
+    candidates: LayaCandidate[],
+  ): Promise<LayaChoice>;
+  dumpAndroidUi(): Promise<PhoneUiNode[]>;
+  capturePhoneScreen(request: ScreenshotRequest): Promise<Screenshot>;
+  ocrScreenshot(id: string): Promise<OcrBox[]>;
+  restartAndroidApp(packageName: string): Promise<void>;
+  startPhoneRecording(): Promise<RecordingStart>;
+  stopPhoneRecording(): Promise<RecordingResult>;
   saveArtefact(input: ArtefactInput): Promise<ArtefactDocument>;
   getArtefact(): Promise<ArtefactDocument | null>;
   openArtefact(): Promise<void>;

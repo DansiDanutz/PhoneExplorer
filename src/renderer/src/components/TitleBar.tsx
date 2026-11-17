@@ -70,6 +70,10 @@ export function TitleBar({
           onClick={onOpenSettings}
           title="Settings"
           aria-label="Settings"
+          data-artefact-id="settings"
+          data-artefact-label="Settings"
+          data-artefact-kind="overlay"
+          data-artefact-description="Capture rate, quality, adb path, defaults and input preferences."
         >
           <Icon name="settings" size={16} />
         </button>

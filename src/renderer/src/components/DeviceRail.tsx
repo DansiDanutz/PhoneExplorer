@@ -82,6 +82,10 @@ export function DeviceRail({
               onClick={onOpenConnect}
               title="Connect a device"
               aria-label="Connect a device"
+              data-artefact-id="connect"
+              data-artefact-label="Connect a phone"
+              data-artefact-kind="overlay"
+              data-artefact-description="USB, Wi-Fi and iPhone pairing instructions and bridge tool readiness."
             >
               <Icon name="plus" size={15} />
             </button>
@@ -121,6 +125,10 @@ export function DeviceRail({
               type="button"
               className="rail-heading-link"
               onClick={() => onOpenModels(activeDemoPlatform)}
+              data-artefact-id="models"
+              data-artefact-label="Phone models"
+              data-artefact-kind="overlay"
+              data-artefact-description="Searchable demo hardware profiles and per-platform defaults."
             >
               Models <Icon name="sliders" size={12} />
             </button>

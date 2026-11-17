@@ -16,8 +16,10 @@ interface InspectorProps {
   tab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
   onPeek: (app: CatalogApp) => void;
-  onWalkthrough: () => void;
-  walkthroughRunning: boolean;
+  onRecord: () => void;
+  onStop: () => void;
+  recording: boolean;
+  recordingProcessing: boolean;
 }
 
 function InstallButton({
@@ -86,8 +88,10 @@ export function Inspector({
   tab,
   onTab,
   onPeek,
-  onWalkthrough,
-  walkthroughRunning,
+  onRecord,
+  onStop,
+  recording,
+  recordingProcessing,
 }: InspectorProps): ReactElement {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -151,6 +155,20 @@ export function Inspector({
             aria-selected={tab === id}
             className={`tab ${tab === id ? 'is-active' : ''}`}
             onClick={() => onTab(id)}
+            data-artefact-id={`tab-${id}`}
+            data-artefact-label={label}
+            data-artefact-kind="tab"
+            data-artefact-description={
+              id === 'discover'
+                ? 'Catalog, search and category filters for the app store.'
+                : id === 'installed'
+                  ? 'Installed packages and launch controls read from the phone.'
+                  : id === 'activity'
+                    ? 'Chronological bridge and install activity log.'
+                    : id === 'library'
+                      ? 'Screenshots captured from the phone and from walkthroughs.'
+                      : 'Generated Pages-style app-understanding documents.'
+            }
           >
             {label}
             {id === 'installed' ? (
@@ -407,8 +425,10 @@ export function Inspector({
       {tab === 'artefacts' ? (
         <Artefacts
           actions={actions}
-          onWalkthrough={onWalkthrough}
-          running={walkthroughRunning}
+          onRecord={onRecord}
+          onStop={onStop}
+          recording={recording}
+          processing={recordingProcessing}
         />
       ) : null}
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ArtefactSection, CatalogApp, PhonePlatform } from '@shared/types';
+import type { ArtefactSection, CatalogApp, PhonePlatform, Screenshot } from '@shared/types';
 import { usePhone } from './hooks/usePhone';
 import { DeviceRail } from './components/DeviceRail';
 import { Inspector, type InspectorTab } from './components/Inspector';
@@ -10,8 +10,6 @@ import { Stage } from './components/Stage';
 import { TitleBar } from './components/TitleBar';
 import { Toasts } from './components/Toasts';
 import { Icon } from './lib/icons';
-
-const wait = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 function BootScreen(): React.ReactElement {
   return (
@@ -82,7 +80,10 @@ export default function App(): React.ReactElement {
   const [modelsReturnToSettings, setModelsReturnToSettings] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [walkthroughRunning, setWalkthroughRunning] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState(0);
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
+  const [recordingProcessing, setRecordingProcessing] = useState(false);
 
   const openModels = (platform: PhonePlatform): void => {
     setModelsReturnToSettings(settingsOpen);
@@ -98,6 +99,16 @@ export default function App(): React.ReactElement {
       setSettingsOpen(true);
     }
   };
+
+  useEffect(() => {
+    if (!recording || recordingStartedAt <= 0) return;
+    const tick = (): void => {
+      setRecordingElapsed(Math.max(0, Math.floor((Date.now() - recordingStartedAt) / 1000)));
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [recording, recordingStartedAt]);
 
   useEffect(() => {
     return window.phone.onNavigate((view) => {
@@ -163,222 +174,108 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener('keydown', onKey);
   }, [actions, focusMode, connectOpen, settingsOpen, peekApp, modelsFor, guideOpen, state?.qr]);
 
-  const setInspectorSearch = (value: string): void => {
-    const input = document.querySelector<HTMLInputElement>('.search-box input');
-    if (!input) return;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    setter?.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  };
-
-  const clickChip = (label: string): void => {
-    const chip = Array.from(document.querySelectorAll<HTMLElement>('.chips .chip')).find(
-      (item) => item.textContent?.trim() === label,
-    );
-    chip?.click();
-  };
-
-  const runWalkthrough = async (): Promise<void> => {
-    if (!state || walkthroughRunning) return;
-    setWalkthroughRunning(true);
-    const sections: ArtefactSection[] = [];
-    const capture = async (id: string, title: string, description: string): Promise<void> => {
-      await wait(520);
-      const shot = await actions.captureScreenshot({
-        fullWindow: true,
-        quiet: true,
-        label: title,
-        caption: description,
-        group: 'walkthrough',
-      });
-      if (!shot) return;
-      const image = await actions.loadScreenshot(shot.id);
-      if (image) sections.push({ id, title, description, image });
-    };
-    const reset = (): void => {
-      setSettingsOpen(false);
-      setConnectOpen(false);
-      setModelsFor(null);
-      setGuideOpen(false);
-      setPeekApp(null);
-      setFocusMode(false);
-    };
-
+  const startPhoneRecording = async (): Promise<void> => {
+    if (!state || recording || recordingProcessing) return;
+    const active = state.devices.find((candidate) => candidate.id === state.activeDeviceId) ?? null;
+    if (!active || active.platform !== 'android' || active.isDemo) {
+      actions.toast(
+        'error',
+        'Connect an Android phone',
+        'Recording reads the real phone screen while you move through the app.',
+      );
+      return;
+    }
     try {
-      reset();
-      void actions.hideQr();
-      setTab('discover');
-      await capture(
-        'discover',
-        'Discover',
-        'The curated storefront. Category chips filter 15 launch-ready apps; each row can open its detail sheet, official store listing or install flow.',
-      );
-
-      setInspectorSearch('GGPoker');
-      await capture(
-        'search',
-        'Search',
-        'The catalog search matches names, publishers, categories and taglines. “PlayGG” finds the same official GGPoker listing as “GGPoker”.',
-      );
-      setInspectorSearch('');
-
-      clickChip('Games');
-      await capture(
-        'category',
-        'Category filter',
-        'Category chips narrow the catalog without a round trip to the phone. Games is the newest category, holding the poker entry.',
-      );
-      clickChip('All');
-
-      setTab('installed');
-      await capture(
-        'installed',
-        'Installed',
-        'A live package inventory read from the phone. Every app can be launched here, and “Install file” sideloads an APK or IPA.',
-      );
-
-      setTab('activity');
-      await capture(
-        'activity',
-        'Activity',
-        'A chronological bridge log. Discovery, install polling, mirror frames and input commands all report here with a timestamp and detail.',
-      );
-
-      setTab('library');
-      await capture(
-        'library',
-        'Library',
-        'Every screenshot captured so far. The walkthrough saves each view here before the document is assembled, so the raw evidence stays browsable.',
-      );
-
-      await wait(600);
-      document.querySelector<HTMLButtonElement>('.shot-card')?.click();
-      await capture(
-        'library-viewer',
-        'Screenshot viewer',
-        'A full-resolution view of any capture, with Reveal, Delete and Done actions. This is the same evidence used to build the document.',
-      );
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-      await wait(250);
-
-      setSettingsOpen(true);
-      await capture(
-        'settings',
-        'Settings',
-        'Capture rate, JPEG quality, adb path and demo defaults live here. Reverse scroll and reduced motion make the mirror easier to control.',
-      );
-      setSettingsOpen(false);
-
-      setConnectOpen(true);
-      await capture(
-        'connect',
-        'Connect a phone',
-        'The connection sheet handles USB and Wi-Fi Android devices plus iPhone pairing. It explains which bridge tools are missing before you connect.',
-      );
-      setConnectOpen(false);
-
-      setModelsFor('android');
-      await capture(
-        'models',
-        'Phone models',
-        'Demo hardware profiles are searchable and editable. Custom models can be saved and one Android and one iPhone can be marked as the defaults.',
-      );
-      const addModel = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
-        (button) => button.textContent?.trim() === 'Add model',
-      );
-      addModel?.click();
-      await capture(
-        'model-form',
-        'Custom phone model',
-        'The add-model form captures name, OS, screen size, body colour and display size, then stores the profile locally and can make it the default demo phone.',
-      );
-      setModelsFor(null);
-
-      setGuideOpen(true);
-      await capture(
-        'guide',
-        'Control guide',
-        'The gesture reference explains how mouse clicks, drags, wheels, arrow keys, right-click and Ctrl/⌘ + wheel map onto real phone gestures.',
-      );
-      setGuideOpen(false);
-
-      const featured = state.catalog.find((app) => app.id === 'ggpoker') ?? state.catalog[0];
-      if (featured) {
-        setPeekApp(featured);
-        await capture(
-          'app-detail',
-          `${featured.name} detail`,
-          `The app sheet for ${featured.name}: publisher, ratings, install state and the official store handoff. On a real phone the store completes the download.`,
-        );
-        setPeekApp(null);
-      }
-
-      await actions.showQr('ggpoker');
-      await capture(
-        'qr',
-        'Store QR handoff',
-        'A QR code opens the same official listing on a phone that is not connected over USB. This is the no-cable path into the mobile store.',
-      );
-      await actions.hideQr();
-
-      setFocusMode(true);
-      await capture(
-        'focus',
-        'Focus mode',
-        'Focus mode removes the rails and inspector so the mirrored phone gets the entire window. Escape returns to the full workspace.',
-      );
-      setFocusMode(false);
-
-      const doc = await actions.saveArtefact({
-        title: 'PhoneExplorer — App Walkthrough',
-        subtitle:
-          'A guided tour of the workspace, captured tab by tab and overlay by overlay. Each page pairs the live screen with a short explanation of what it does.',
-        deviceName: device ? `${device.name} · ${device.platform === 'ios' ? 'iPhone' : 'Android'}` : 'PhoneExplorer',
-        sections,
-        quiet: true,
-      });
-      if (!doc) throw new Error('The document could not be saved.');
-
-      setWalkthroughRunning(false);
-      setTab('artefacts');
-      await wait(900);
-      const cover = await actions.captureScreenshot({
-        fullWindow: true,
-        quiet: true,
-        label: 'Artefacts',
-        caption:
-          'The finished Pages-style document in the new Artefacts tab. Each page has a screenshot, a short explanation and a page number.',
-        group: 'walkthrough',
-      });
-      if (cover) {
-        const image = await actions.loadScreenshot(cover.id);
-        if (image) {
-          sections.push({
-            id: 'artefacts',
-            title: 'Artefacts',
-            description:
-              'The finished Pages-style document in the new Artefacts tab. Each page has a screenshot, a short explanation and a page number.',
-            image,
-          });
-          await actions.saveArtefact({
-            title: doc.title,
-            subtitle: doc.subtitle,
-            deviceName: doc.deviceName,
-            sections,
-            quiet: true,
-          });
-        }
-      }
-      actions.toast('success', 'Walkthrough complete', `${sections.length} views captured`);
+      const started = await actions.startPhoneRecording();
+      setRecording(true);
+      setRecordingStartedAt(started.startedAt);
+      setRecordingElapsed(0);
     } catch (error) {
       actions.toast(
         'error',
-        'Walkthrough failed',
+        'Could not start recording',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  };
+
+  const buildRecordingArtefact = async (
+    shots: Screenshot[],
+    videoPath: string,
+  ): Promise<void> => {
+    const sections: ArtefactSection[] = [];
+    const seen: Array<Set<string>> = [];
+    for (const shot of shots.slice(0, 80)) {
+      if (sections.length >= 40) break;
+      const boxes = await actions.ocrScreenshot(shot.id);
+      const tokens = new Set(
+        boxes
+          .flatMap((box) => box.text.toLowerCase().split(/\s+/))
+          .map((token) => token.replace(/[^a-z0-9]/g, ''))
+          .filter((token) => token.length > 1),
+      );
+      if (tokens.size > 0) {
+        const duplicate = seen.some((previous) => {
+          const union = new Set([...previous, ...tokens]);
+          let intersection = 0;
+          for (const token of tokens) if (previous.has(token)) intersection += 1;
+          return union.size > 0 && intersection / union.size >= 0.82;
+        });
+        if (duplicate) continue;
+        seen.push(tokens);
+      }
+      const image = await actions.loadScreenshot(shot.id);
+      if (!image) continue;
+      const title =
+        boxes
+          .map((box) => box.text.trim())
+          .filter(
+            (text) =>
+              text.length >= 4 &&
+              !/^\d|^\d{1,2}:\d{2}|a\.m\.|p\.m\.|baterie|wi-fi|notification|^[$€£]/i.test(text),
+          )
+          .sort((a, b) => b.length - a.length)[0]
+          ?.slice(0, 60) ?? `Phone view ${sections.length + 1}`;
+      sections.push({
+        id: shot.id,
+        title,
+        description:
+          shot.caption ||
+          `Recorded phone view captured at ${new Date(shot.createdAt).toLocaleTimeString()}.`,
+        image,
+      });
+    }
+    if (sections.length === 0) {
+      actions.toast('error', 'No distinct phone screens', 'The recording did not produce usable screenshots.');
+      return;
+    }
+    const doc = await actions.saveArtefact({
+      title: 'Recorded phone — App Walkthrough',
+      subtitle: `A user-driven phone session. ${sections.length} distinct screens selected from ${shots.length} live screenshots and video frames.${videoPath ? ' The source video is saved beside the recording library.' : ''}`,
+      deviceName: `${state?.devices.find((candidate) => candidate.id === state.activeDeviceId)?.name ?? 'Phone'} · Android`,
+      sections,
+      quiet: true,
+    });
+    if (!doc) return;
+    setTab('artefacts');
+    actions.toast('success', 'Artefact ready', `${sections.length} phone screens`);
+  };
+
+  const stopPhoneRecording = async (): Promise<void> => {
+    if (!recording || recordingProcessing) return;
+    setRecordingProcessing(true);
+    try {
+      const result = await actions.stopPhoneRecording();
+      setRecording(false);
+      await buildRecordingArtefact(result.screenshots, result.videoPath);
+    } catch (error) {
+      actions.toast(
+        'error',
+        'Could not finish recording',
         error instanceof Error ? error.message : String(error),
       );
     } finally {
-      reset();
-      setWalkthroughRunning(false);
+      setRecordingProcessing(false);
     }
   };
 
@@ -432,8 +329,10 @@ export default function App(): React.ReactElement {
             tab={tab}
             onTab={setTab}
             onPeek={(app) => setPeekApp(app)}
-            onWalkthrough={() => void runWalkthrough()}
-            walkthroughRunning={walkthroughRunning}
+            onRecord={() => void startPhoneRecording()}
+            onStop={() => void stopPhoneRecording()}
+            recording={recording}
+            recordingProcessing={recordingProcessing}
           />
         ) : null}
       </main>
@@ -446,6 +345,27 @@ export default function App(): React.ReactElement {
         version={state.version}
         platform={state.platform}
       />
+
+      {recording || recordingProcessing ? (
+        <div className="walkthrough-hud recording-hud" role="status">
+          <span className={`recording-dot ${recordingProcessing ? 'is-processing' : ''}`} />
+          <div className="walkthrough-copy">
+            <strong>{recordingProcessing ? 'Extracting screenshots from the recording…' : 'Recording the phone'}</strong>
+            <span>
+              {recordingProcessing
+                ? 'Video frames and live screenshots are being collected.'
+                : `${String(Math.floor(recordingElapsed / 60)).padStart(2, '0')}:${String(recordingElapsed % 60).padStart(2, '0')} · screenshots every 2 seconds · move through the app`}
+            </span>
+          </div>
+          {recording ? (
+            <button type="button" className="walkthrough-stop" onClick={() => void stopPhoneRecording()}>
+              Stop recording
+            </button>
+          ) : (
+            <span className="mini-spinner" />
+          )}
+        </div>
+      ) : null}
 
       <Toasts toasts={toasts} onDismiss={dismissToast} />
 

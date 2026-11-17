@@ -6,8 +6,10 @@ import { Overlay } from './Modals';
 
 interface ArtefactsProps {
   actions: PhoneActions;
-  onWalkthrough: () => void;
-  running: boolean;
+  onRecord: () => void;
+  onStop: () => void;
+  recording: boolean;
+  processing: boolean;
 }
 
 function prettyFolder(path: string): string {
@@ -23,7 +25,7 @@ function prettyDate(ts: number): string {
   });
 }
 
-export function Artefacts({ actions, onWalkthrough, running }: ArtefactsProps): ReactElement {
+export function Artefacts({ actions, onRecord, onStop, recording, processing }: ArtefactsProps): ReactElement {
   const [doc, setDoc] = useState<ArtefactDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<number | null>(null);
@@ -87,11 +89,15 @@ export function Artefacts({ actions, onWalkthrough, running }: ArtefactsProps): 
       <button
         type="button"
         className="btn btn-primary artefact-run"
-        onClick={onWalkthrough}
-        disabled={running}
+        onClick={recording ? onStop : onRecord}
+        disabled={processing}
       >
-        {running ? <span className="mini-spinner" /> : <Icon name="camera" size={15} />}
-        {running ? 'Capturing the app…' : doc ? 'Recapture walkthrough' : 'Capture walkthrough'}
+        {processing ? <span className="mini-spinner" /> : <Icon name="camera" size={15} />}
+        {processing
+          ? 'Extracting screenshots…'
+          : recording
+            ? 'Stop recording'
+            : 'Record an artefact'}
       </button>
 
       {loading && !doc ? (
@@ -106,8 +112,9 @@ export function Artefacts({ actions, onWalkthrough, running }: ArtefactsProps): 
           </span>
           <h3>No artefact yet</h3>
           <p>
-            Run the walkthrough: PhoneExplorer opens every tab and key overlay, saves each view
-            to the Library, then lays them out as a short document here.
+            Record an artefact: move through the phone yourself. PhoneExplorer records the video,
+            captures screenshots every two seconds, then selects the distinct phone views and
+            lays them out as a document here.
           </p>
         </div>
       ) : (

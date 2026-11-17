@@ -158,24 +158,21 @@ wheel direction.
 
 ## Artefacts and app understanding
 
-`Artefacts` is the tab immediately after Library. Its **Capture walkthrough** button runs a
-single deterministic renderer sequence: Discover, search, category filter, Installed,
-Activity, Library, Library viewer, Settings, Connect, Models, the custom-model form, the
-gesture guide, an app detail sheet, the store QR, focus mode and finally Artefacts itself.
-Each step switches real application state, waits for paint, then asks the main process for a
-full-window `capturePage()` screenshot. Captures carry a label, one-line caption and the
-`walkthrough` group, so they appear in Library exactly like phone screenshots.
+`Artefacts` is the tab immediately after Library. **Record an artefact** starts Android
+`screenrecord` on the active phone and a two-second `screencap` loop. The user moves the phone
+through the app; the recorder never sends a tap. Both the MP4 and the live screenshots are kept
+under `~/Pictures/PhoneExplorer/Recordings` and `~/Pictures/PhoneExplorer`.
 
-The document is persisted as `Artefacts/artefact.json` plus a self-contained
-`Artefacts/artefact.html` beside the screenshots (normally under `~/Pictures/PhoneExplorer`,
-with the same data-directory fallback as Library). The HTML uses A4 page CSS and embeds the
-PNG data, so **Open** works without a server and the browser's Print command produces a PDF.
-The panel renders the same data as a Pages-like stack and a full-page reader.
+On stop, the main process pulls the MP4, asks ffmpeg for scene-change keyframes (falling back
+to one frame per second for static UI), converts them to PNG, and imports them through the
+existing screenshot Library pipeline. The renderer runs Tesseract OCR, deduplicates frames by
+token overlap, names each distinct screen from its visible text, and writes the Pages-style
+document. A HUD shows elapsed time and offers **Stop recording**; the HUD is never part of the
+phone video because capture is entirely on the phone.
 
-The interaction model was informed by a REA inspection of `Paper.app` 0.5.19: REA confirmed
-an Electron/ASAR shell and its Electron fuse state. Paper's design surface is remote, so the
-portable primitive is the structured snapshot (screen + label + explanation), not a local
-renderer API. The walkthrough applies that primitive to PhoneExplorer itself.
+This path requires Android `screenrecord`, ffmpeg and Tesseract. It intentionally replaces the
+previous automatic tap explorer: paper-style design snapshots (REA) remain the reference model,
+but the live evidence now comes from a user-driven recording rather than synthetic clicks.
 
 ## Screenshot library
 
@@ -272,6 +269,7 @@ phone:model:select     phone:model:default    phone:model:add    phone:model:del
 phone:screenshot:capture phone:screenshot:list phone:screenshot:load
 phone:screenshot:delete phone:screenshot:reveal phone:screenshot:folder
 phone:artefact:save   phone:artefact:get     phone:artefact:open  phone:artefact:reveal
+phone:ui:dump phone:ui:capture phone:ui:ocr phone:ui:restart phone:record:start phone:record:stop
 ```
 
 Events are one channel, `phone:event`, with a discriminated union: `state`, `frame`,
@@ -323,7 +321,7 @@ demo platform, reduce motion. Settings are clamped on load and saved on change.
 | `scripts/e2e-models.mjs` | search, switch, add, default, persist and delete demo hardware profiles |
 | `scripts/e2e-gestures.mjs` | guide, right-click Back, wheel scroll, pinch fallback and long-press on the demo |
 | `scripts/e2e-library.mjs` | margin screenshot, 402×874 PNG, Library preview and delete |
-| `scripts/e2e-artefacts.mjs` | 16-view walkthrough, Library evidence and generated HTML document |
+| `scripts/e2e-phone-artefacts.mjs` | device-only recording, Library evidence and Pages document |
 | `scripts/e2e-real.mjs` | real Android pipeline against a fake `adb`: discovery, `screencap` frames, install detection, `monkey` launch, `market://` links, scroll, long-press, Back/Home, pinch fallback |
 | `scrcpy-control.test.ts` | the control session fails closed and rejects gestures when unavailable |
 | `xmllint` (dev) | every generated SVG is valid XML |

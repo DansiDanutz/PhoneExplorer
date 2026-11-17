@@ -1,3 +1,4 @@
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { basename, join } from 'node:path';
 import { app, dialog, nativeImage, shell, type BrowserWindow } from 'electron';
@@ -21,8 +22,14 @@ import type {
   InstallProgress,
   InstalledApp,
   KeyAction,
+  LayaCandidate,
+  LayaChoice,
+  OcrBox,
   PhonePlatform,
+  PhoneUiNode,
   QrPayload,
+  RecordingResult,
+  RecordingStart,
   ServerEvent,
   Screenshot,
   ScreenshotRequest,
@@ -41,6 +48,8 @@ import { AdbClient, AdbError, prettyPackageName } from './adb';
 import { ScrcpyControl } from './scrcpy-control';
 import { DemoDevice, DEMO_HEIGHT, DEMO_WIDTH } from './demo';
 import { IosBridge } from './ios';
+import { LayaClient } from './laya';
+import { OcrService } from './ocr';
 
 const DEFAULT_SETTINGS: Settings = {
   fps: 5,
@@ -167,6 +176,8 @@ export interface ManagerOptions {
 export class DeviceManager {
   private readonly adb: AdbClient;
   private readonly ios = new IosBridge();
+  private readonly laya = new LayaClient();
+  private readonly ocr = new OcrService();
   private readonly demos: Record<PhonePlatform, DemoDevice> = {
     android: new DemoDevice('android', defaultPhoneModel('android')),
     ios: new DemoDevice('ios', defaultPhoneModel('ios')),
@@ -205,6 +216,17 @@ export class DeviceManager {
   private demoGestureNotices = new Map<string, number>();
   private screenshotRoot: string | null = null;
   private artefactRoot: string | null = null;
+  private recordingRoot: string | null = null;
+  private phoneRecording: {
+    child: ChildProcess;
+    serial: string;
+    remote: string;
+    local: string;
+    startedAt: number;
+    timer: NodeJS.Timeout;
+    shots: Screenshot[];
+    tickBusy: boolean;
+  } | null = null;
   private scrollBusy = false;
   private pendingScroll: { nx: number; ny: number; deltaX: number; deltaY: number } | null = null;
 
@@ -1289,6 +1311,318 @@ export class DeviceManager {
     }
     shots.sort((a, b) => b.createdAt - a.createdAt);
     return shots.slice(0, 80);
+  }
+
+  async chooseWithLaya(
+    state: Record<string, unknown>,
+    candidates: LayaCandidate[],
+  ): Promise<LayaChoice> {
+    return this.laya.choose(state, candidates);
+  }
+
+  private async ensureRecordingDir(): Promise<string> {
+    if (this.recordingRoot) return this.recordingRoot;
+    const shots = await this.ensureScreenshotDir();
+    const dir = join(shots, 'Recordings');
+    await fs.mkdir(dir, { recursive: true });
+    this.recordingRoot = dir;
+    return dir;
+  }
+
+  async startPhoneRecording(): Promise<RecordingStart> {
+    if (this.phoneRecording) throw new Error('A phone recording is already running.');
+    const device = this.activeDevice;
+    if (!device || device.platform !== 'android' || device.isDemo) {
+      throw new Error('Connect a real Android phone to record.');
+    }
+    const bin = this.adb.path;
+    if (!bin) throw new Error('adb was not found.');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    const dir = await this.ensureRecordingDir();
+    const local = join(dir, `Recording-${stamp}.mp4`);
+    const remote = `/sdcard/PhoneExplorer-recording-${Date.now()}.mp4`;
+    const child = spawn(
+      bin,
+      [
+        '-s',
+        device.serial,
+        'shell',
+        'screenrecord',
+        '--bit-rate',
+        '8000000',
+        '--time-limit',
+        '300',
+        remote,
+      ],
+      { stdio: ['ignore', 'ignore', 'pipe'] },
+    );
+    let stderr = '';
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      void this.captureRecordingShot();
+    }, 2000);
+    this.phoneRecording = {
+      child,
+      serial: device.serial,
+      remote,
+      local,
+      startedAt,
+      timer,
+      shots: [],
+      tickBusy: false,
+    };
+    child.once('error', (error) => {
+      this.log('error', 'Phone recording failed', error.message);
+    });
+    child.once('exit', (code) => {
+      if (code && code !== 0 && stderr.trim()) {
+        this.log('warn', 'Phone recording ended', stderr.trim().slice(0, 400));
+      }
+    });
+    this.log('info', 'Phone recording started', local);
+    this.toast('info', 'Recording the phone', 'Move through the app; screenshots are captured as you go.');
+    return { startedAt, videoPath: local };
+  }
+
+  private async captureRecordingShot(): Promise<void> {
+    const rec = this.phoneRecording;
+    if (!rec || rec.tickBusy) return;
+    rec.tickBusy = true;
+    try {
+      const result = await this.adb.run(
+        ['-s', rec.serial, 'exec-out', 'screencap', '-p'],
+        12_000,
+      );
+      if (result.stdout.length < 1_000) return;
+      const elapsed = Math.max(0, Math.round((Date.now() - rec.startedAt) / 1000));
+      const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const ss = String(elapsed % 60).padStart(2, '0');
+      const shot = await this.captureScreenshot({
+        dataUrl: `data:image/png;base64,${result.stdout.toString('base64')}`,
+        label: `Recording · ${mm}:${ss}`,
+        caption: `A phone screenshot captured while the user was moving through the app at ${mm}:${ss}.`,
+        group: 'recording',
+        quiet: true,
+      });
+      rec.shots.push(shot);
+    } catch (error) {
+      this.log(
+        'warn',
+        'Recording screenshot missed',
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      rec.tickBusy = false;
+    }
+  }
+
+  async stopPhoneRecording(): Promise<RecordingResult> {
+    const rec = this.phoneRecording;
+    if (!rec) throw new Error('No phone recording is running.');
+    this.phoneRecording = null;
+    clearInterval(rec.timer);
+    try {
+      await this.adb.text(rec.serial, ['shell', 'pkill', '-INT', 'screenrecord'], 8_000);
+    } catch {
+      // screenrecord may already have hit its time limit.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    try {
+      if (!rec.child.killed) rec.child.kill('SIGINT');
+    } catch {
+      // ignore
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    let videoPath = '';
+    try {
+      await this.adb.run(['-s', rec.serial, 'pull', rec.remote, rec.local], 30_000);
+      const stat = await fs.stat(rec.local);
+      if (stat.isFile() && stat.size > 1024) videoPath = rec.local;
+      await this.adb.text(rec.serial, ['shell', 'rm', '-f', rec.remote], 8_000).catch(() => '');
+    } catch (error) {
+      this.log('warn', 'Could not pull the recording', String(error));
+    }
+
+    const videoShots: Screenshot[] = [];
+    if (videoPath) {
+      try {
+        videoShots.push(...(await this.extractVideoFrames(videoPath)));
+      } catch (error) {
+        this.log('warn', 'Could not extract recording frames', String(error));
+      }
+    }
+    const shots = [...rec.shots, ...videoShots].sort((a, b) => a.createdAt - b.createdAt);
+    this.log('success', 'Phone recording stopped', `${shots.length} screenshots`);
+    this.toast('success', 'Recording finished', `${shots.length} screenshots extracted`);
+    return {
+      startedAt: rec.startedAt,
+      stoppedAt: Date.now(),
+      videoPath,
+      screenshots: shots,
+    };
+  }
+
+  private async extractVideoFrames(videoPath: string): Promise<Screenshot[]> {
+    const dir = join(await this.ensureRecordingDir(), `frames-${Date.now()}`);
+    await fs.mkdir(dir, { recursive: true });
+    const output = join(dir, 'frame-%03d.jpg');
+    const run = (args: string[]): Promise<void> =>
+      new Promise((resolve, reject) => {
+        execFile('/opt/homebrew/bin/ffmpeg', args, { timeout: 120_000, maxBuffer: 16 * 1024 * 1024 }, (error, _stdout, stderr) => {
+          if (error) reject(new Error(stderr.trim() || error.message));
+          else resolve();
+        });
+      });
+    await run([
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-i',
+      videoPath,
+      '-vf',
+      "select='eq(n,0)+gt(scene,0.12)',scale=720:-2",
+      '-fps_mode',
+      'vfr',
+      '-q:v',
+      '2',
+      output,
+    ]);
+    let files = (await fs.readdir(dir)).filter((file) => /^frame-\d+\.jpg$/.test(file)).sort();
+    if (files.length < 3) {
+      // A static UI may produce only the opening scene frame. Sample the
+      // recording at one frame per second as a fallback.
+      const fallback = join(dir, 'fallback-%03d.jpg');
+      await run([
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-i',
+        videoPath,
+        '-vf',
+        'fps=1,scale=720:-2',
+        '-q:v',
+        '2',
+        fallback,
+      ]);
+      const extra = (await fs.readdir(dir))
+        .filter((file) => /^fallback-\d+\.jpg$/.test(file))
+        .sort();
+      files = [...files, ...extra];
+    }
+    const shots: Screenshot[] = [];
+    for (const [index, file] of files.slice(0, 40).entries()) {
+      const buffer = await fs.readFile(join(dir, file));
+      const shot = await this.captureScreenshot({
+        dataUrl: `data:image/jpeg;base64,${buffer.toString('base64')}`,
+        label: `Video frame ${String(index + 1).padStart(2, '0')}`,
+        caption: 'A distinct keyframe extracted from the phone recording video.',
+        group: 'recording',
+        quiet: true,
+      });
+      shots.push(shot);
+    }
+    await fs.rm(dir, { recursive: true, force: true });
+    return shots;
+  }
+
+  async restartAndroidApp(packageName: string): Promise<void> {
+    const device = this.activeDevice;
+    if (!device || device.platform !== 'android' || device.isDemo) {
+      throw new Error('Connect a real Android phone first.');
+    }
+    if (!/^[a-zA-Z0-9_.]+$/.test(packageName)) throw new Error('Invalid Android package name.');
+    await this.adb.text(device.serial, ['shell', 'am', 'force-stop', packageName], 10_000);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await this.adb.text(
+      device.serial,
+      ['shell', 'monkey', '-p', packageName, '-c', 'android.intent.category.LAUNCHER', '1'],
+      12_000,
+    );
+  }
+
+  async capturePhoneScreen(request: ScreenshotRequest): Promise<Screenshot> {
+    const device = this.activeDevice;
+    if (!device || device.platform !== 'android' || device.isDemo) {
+      throw new Error('Connect a real Android phone to capture its screen.');
+    }
+    const result = await this.adb.run(['-s', device.serial, 'exec-out', 'screencap', '-p'], 20_000);
+    if (result.stdout.length < 1_000) throw new Error('The phone returned an empty screenshot.');
+    return this.captureScreenshot({
+      ...request,
+      dataUrl: `data:image/png;base64,${result.stdout.toString('base64')}`,
+      quiet: request.quiet ?? true,
+    });
+  }
+
+  async ocrScreenshot(id: string): Promise<OcrBox[]> {
+    const path = await this.screenshotPath(id);
+    const image = nativeImage.createFromPath(path);
+    if (image.isEmpty()) throw new Error('The screenshot could not be read for OCR.');
+    const size = image.getSize();
+    return this.ocr.recognize(path, size.width, size.height);
+  }
+
+  async dumpAndroidUi(): Promise<PhoneUiNode[]> {
+    const device = this.activeDevice;
+    if (!device || device.platform !== 'android') {
+      throw new Error('Select a connected Android phone to inspect its UI.');
+    }
+    if (device.isDemo) throw new Error('The UI walkthrough needs a real Android phone.');
+    const remote = '/sdcard/phoneexplorer-window.xml';
+    await this.adb.text(device.serial, ['shell', 'uiautomator', 'dump', remote], 20_000);
+    const xml = await this.adb.text(device.serial, ['exec-out', 'cat', remote], 20_000);
+    const resolution = device.resolution ?? this.frameSize;
+    if (!resolution) throw new Error('The phone did not report its resolution.');
+    const nodes: PhoneUiNode[] = [];
+    const pattern = /<node\b([^>]*)\/?>/g;
+    let match: RegExpExecArray | null;
+    let index = 0;
+    const decode = (value: string): string =>
+      value
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&amp;', '&');
+    while ((match = pattern.exec(xml))) {
+      const attrs = match[1];
+      const attr = (name: string): string => {
+        const found = new RegExp(`${name}="([^"]*)"`).exec(attrs);
+        return found ? decode(found[1]) : '';
+      };
+      const bounds = /\[(\d+),(\d+)\]\[(\d+),(\d+)\]/.exec(attr('bounds'));
+      if (!bounds) continue;
+      const [x1, y1, x2, y2] = bounds.slice(1).map(Number);
+      const width = x2 - x1;
+      const height = y2 - y1;
+      if (width <= 0 || height <= 0) continue;
+      const text = attr('text').trim();
+      const desc = attr('content-desc').trim();
+      const resource = attr('resource-id').trim();
+      const role = attr('class').split('.').pop() ?? '';
+      const label = text || desc || resource || role || `node-${index}`;
+      nodes.push({
+        id: resource || desc || text || `node-${index}`,
+        label: label.slice(0, 120),
+        role,
+        packageName: attr('package'),
+        bounds: { x: x1, y: y1, width, height },
+        center: {
+          x: (x1 + width / 2) / resolution.width,
+          y: (y1 + height / 2) / resolution.height,
+        },
+        clickable: attr('clickable') === 'true',
+        enabled: attr('enabled') === 'true',
+        selected: attr('selected') === 'true',
+        scrollable: attr('scrollable') === 'true',
+      });
+      index += 1;
+    }
+    if (nodes.length === 0) throw new Error('The phone returned an empty UI tree.');
+    return nodes;
   }
 
   async captureScreenshot(request: ScreenshotRequest): Promise<Screenshot> {

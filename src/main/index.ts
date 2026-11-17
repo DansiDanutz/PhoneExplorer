@@ -12,6 +12,7 @@ import {
 import type {
   ArtefactInput,
   KeyAction,
+  LayaCandidate,
   NewPhoneModel,
   PhonePlatform,
   ScreenshotRequest,
@@ -250,6 +251,17 @@ function registerIpc(instance: DeviceManager): void {
   handle('phone:press', (key: KeyAction) => instance.press(key));
   handle('phone:type', (text: string) => instance.typeText(text));
   handle('phone:screenshot:capture', (request: ScreenshotRequest) => instance.captureScreenshot(request));
+  handle(
+    'phone:laya:choose',
+    (state: Record<string, unknown>, candidates: LayaCandidate[]) =>
+      instance.chooseWithLaya(state, candidates),
+  );
+  handle('phone:ui:dump', () => instance.dumpAndroidUi());
+  handle('phone:ui:capture', (request: ScreenshotRequest) => instance.capturePhoneScreen(request));
+  handle('phone:ui:ocr', (id: string) => instance.ocrScreenshot(id));
+  handle('phone:ui:restart', (packageName: string) => instance.restartAndroidApp(packageName));
+  handle('phone:record:start', () => instance.startPhoneRecording());
+  handle('phone:record:stop', () => instance.stopPhoneRecording());
   handle('phone:screenshot:list', () => instance.listScreenshots());
   handle('phone:screenshot:folder-path', () => instance.getScreenshotsFolder());
   handle('phone:screenshot:load', (id: string) => instance.loadScreenshot(id));

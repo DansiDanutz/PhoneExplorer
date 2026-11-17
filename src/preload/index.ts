@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ArtefactInput,
   KeyAction,
+  LayaCandidate,
   NewPhoneModel,
   PhoneAPI,
   PhonePlatform,
@@ -37,6 +38,14 @@ const api: PhoneAPI = {
   press: (key: KeyAction) => invoke('phone:press', key),
   typeText: (text: string) => invoke('phone:type', text),
   captureScreenshot: (request: ScreenshotRequest) => invoke('phone:screenshot:capture', request),
+  chooseWithLaya: (state: Record<string, unknown>, candidates: LayaCandidate[]) =>
+    invoke('phone:laya:choose', state, candidates),
+  dumpAndroidUi: () => invoke('phone:ui:dump'),
+  capturePhoneScreen: (request: ScreenshotRequest) => invoke('phone:ui:capture', request),
+  ocrScreenshot: (id: string) => invoke('phone:ui:ocr', id),
+  restartAndroidApp: (packageName: string) => invoke('phone:ui:restart', packageName),
+  startPhoneRecording: () => invoke('phone:record:start'),
+  stopPhoneRecording: () => invoke('phone:record:stop'),
   saveArtefact: (input: ArtefactInput) => invoke('phone:artefact:save', input),
   getArtefact: () => invoke('phone:artefact:get'),
   openArtefact: () => invoke('phone:artefact:open'),
