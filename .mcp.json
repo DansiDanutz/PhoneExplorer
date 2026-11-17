@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "phoneexplorer": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/node",
+      "args": [
+        "/Users/davidai/Applications/PhoneExplorer.app/Contents/Resources/mcp/server.mjs"
+      ],
+      "env": {}
+    }
+  }
+}

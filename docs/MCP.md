@@ -40,10 +40,13 @@ args = ["/Users/davidai/Applications/PhoneExplorer.app/Contents/Resources/mcp/se
 
 ### Claude Code
 
-```bash
-claude mcp add phoneexplorer -- \
-  node /Users/davidai/.t3/projects/phoneexplorer/mcp/server.mjs
-```
+The repository includes [`.mcp.json`](../.mcp.json), so Claude Code opened in this
+project will offer the **phoneexplorer** server. On this machine the server is
+also registered globally in `~/.claude.json`; restart Claude Code and approve the
+project server if prompted.
+
+If `claude mcp add` reports the config is locked, use the project `.mcp.json`
+instead of editing the global file while Claude Desktop is running.
 
 ### DeepSeek or any generic MCP client
 
