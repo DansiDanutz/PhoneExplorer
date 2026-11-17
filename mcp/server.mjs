@@ -289,13 +289,28 @@ async function handle(message) {
       serverInfo: { name: 'phoneexplorer', version: '0.1.0' },
     };
   }
+  if (method === 'server/discover') return undefined;
   if (method === 'ping') return {};
-  if (method === 'tools/list') return { tools };
+  if (method === 'tools/list') {
+    return {
+      resultType: 'complete',
+      tools,
+      ttlMs: 0,
+      cacheScope: 'private',
+      _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'phoneexplorer', version: '0.1.0' } },
+    };
+  }
   if (method === 'tools/call') {
     try {
-      return await callTool(params?.name, params?.arguments || {});
+      const result = await callTool(params?.name, params?.arguments || {});
+      return {
+        ...result,
+        resultType: 'complete',
+        ttlMs: 0,
+        cacheScope: 'private',
+      };
     } catch (error) {
-      return errorResult(error);
+      return { ...errorResult(error), resultType: 'complete', ttlMs: 0, cacheScope: 'private' };
     }
   }
   if (method === 'notifications/initialized' || method === 'notifications/cancelled') return undefined;
@@ -315,9 +330,15 @@ rl.on('line', (line) => {
     return;
   }
   const isNotification = message.id === undefined;
+  if (process.env.PHONEEXPLORER_MCP_DEBUG === '1') {
+    process.stderr.write(`recv ${JSON.stringify({ id: message.id, method: message.method })}\n`);
+  }
   void handle(message)
     .then((result) => {
       if (isNotification || result === undefined) return;
+      if (process.env.PHONEEXPLORER_MCP_DEBUG === '1') {
+        process.stderr.write(`send ${JSON.stringify({ id: message.id, method: message.method })}\n`);
+      }
       process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }) + '\n');
     })
     .catch((error) => {
