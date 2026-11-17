@@ -137,6 +137,7 @@ export function Library({ actions, onDiscover }: LibraryProps): ReactElement {
                 <span>
                   {shotDate(shot.createdAt)} · {shot.width}×{shot.height}
                 </span>
+                {shot.caption ? <span className="shot-caption">{shot.caption}</span> : null}
               </span>
             </button>
           ))}

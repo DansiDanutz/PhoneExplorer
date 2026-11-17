@@ -6,8 +6,9 @@ import { clockTime, levelTone, storeName, timeAgo, truncate } from '../lib/forma
 import { Icon } from '../lib/icons';
 import { AppTile, MonogramTile, StoreGlyph } from './AppMark';
 import { Library } from './Library';
+import { Artefacts } from './Artefacts';
 
-export type InspectorTab = 'discover' | 'installed' | 'activity' | 'library';
+export type InspectorTab = 'discover' | 'installed' | 'activity' | 'library' | 'artefacts';
 
 interface InspectorProps {
   state: AppState;
@@ -15,6 +16,8 @@ interface InspectorProps {
   tab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
   onPeek: (app: CatalogApp) => void;
+  onWalkthrough: () => void;
+  walkthroughRunning: boolean;
 }
 
 function InstallButton({
@@ -77,7 +80,15 @@ function InstallButton({
   );
 }
 
-export function Inspector({ state, actions, tab, onTab, onPeek }: InspectorProps): ReactElement {
+export function Inspector({
+  state,
+  actions,
+  tab,
+  onTab,
+  onPeek,
+  onWalkthrough,
+  walkthroughRunning,
+}: InspectorProps): ReactElement {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
   const active = state.devices.find((device) => device.id === state.activeDeviceId) ?? null;
@@ -130,6 +141,7 @@ export function Inspector({ state, actions, tab, onTab, onPeek }: InspectorProps
             ['installed', 'Installed'],
             ['activity', 'Activity'],
             ['library', 'Library'],
+            ['artefacts', 'Artefacts'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -390,6 +402,14 @@ export function Inspector({ state, actions, tab, onTab, onPeek }: InspectorProps
 
       {tab === 'library' ? (
         <Library actions={actions} onDiscover={() => onTab('discover')} />
+      ) : null}
+
+      {tab === 'artefacts' ? (
+        <Artefacts
+          actions={actions}
+          onWalkthrough={onWalkthrough}
+          running={walkthroughRunning}
+        />
       ) : null}
 
       {tab === 'activity' ? (

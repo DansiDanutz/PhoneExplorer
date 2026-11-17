@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
+  ArtefactInput,
   KeyAction,
   NewPhoneModel,
   PhoneAPI,
@@ -36,6 +37,10 @@ const api: PhoneAPI = {
   press: (key: KeyAction) => invoke('phone:press', key),
   typeText: (text: string) => invoke('phone:type', text),
   captureScreenshot: (request: ScreenshotRequest) => invoke('phone:screenshot:capture', request),
+  saveArtefact: (input: ArtefactInput) => invoke('phone:artefact:save', input),
+  getArtefact: () => invoke('phone:artefact:get'),
+  openArtefact: () => invoke('phone:artefact:open'),
+  revealArtefact: () => invoke('phone:artefact:reveal'),
   listScreenshots: () => invoke('phone:screenshot:list'),
   getScreenshotsFolder: () => invoke('phone:screenshot:folder-path'),
   loadScreenshot: (id: string) => invoke('phone:screenshot:load', id),

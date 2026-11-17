@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { app, dialog, nativeImage, shell, type BrowserWindow } from 'electron';
 import QRCode from 'qrcode';
 import {
@@ -13,6 +13,8 @@ import type {
   ActivityItem,
   ActivityLevel,
   AppState,
+  ArtefactDocument,
+  ArtefactInput,
   CatalogApp,
   DeviceInfo,
   FramePayload,
@@ -70,11 +72,89 @@ interface StoredScreenshot {
   height: number;
   deviceName: string;
   platform: PhonePlatform | null;
+  caption?: string;
+  group?: string;
 }
 
 interface ScreenshotIndex {
   version: 1;
   items: StoredScreenshot[];
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function artefactHtml(input: ArtefactInput, createdAt: number): string {
+  const date = new Date(createdAt).toLocaleString(undefined, {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  });
+  const pages = input.sections
+    .map(
+      (section, index) => `<section class="page shot">
+        <header class="page-head">
+          <span class="eyebrow">${String(index + 1).padStart(2, '0')} / ${String(input.sections.length).padStart(2, '0')}</span>
+          <span class="brand">PHONEEXPLORER · ARTEFACTS</span>
+        </header>
+        <h2>${escapeHtml(section.title)}</h2>
+        <p class="lede">${escapeHtml(section.description)}</p>
+        <figure><img src="${section.image}" alt="${escapeHtml(section.title)}"/></figure>
+        <footer class="page-foot"><span>${escapeHtml(input.deviceName)}</span><span>${escapeHtml(date)}</span></footer>
+      </section>`,
+    )
+    .join('');
+  const cover = `<section class="page cover">
+    <div class="cover-mark">OA</div>
+    <div class="eyebrow">APP UNDERSTANDING · WALKTHROUGH</div>
+    <h1>${escapeHtml(input.title)}</h1>
+    <p class="cover-sub">${escapeHtml(input.subtitle)}</p>
+    <dl>
+      <div><dt>Device</dt><dd>${escapeHtml(input.deviceName)}</dd></div>
+      <div><dt>Captured</dt><dd>${escapeHtml(date)}</dd></div>
+      <div><dt>Views</dt><dd>${input.sections.length}</dd></div>
+    </dl>
+    <p class="cover-note">Every view was opened, captured and described automatically. The pattern follows Paper.app's structured design snapshots, inspected with REA. Screenshots also live in the Library.</p>
+  </section>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${escapeHtml(input.title)}</title>
+<style>
+  :root { color-scheme: light; --ink:#16181c; --muted:#6d706f; --line:#d9d4c8; --paper:#fffdf8; --accent:#c8ff3d; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:#dedbd2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif; }
+  .page { width:210mm; min-height:297mm; padding:22mm 20mm 18mm; margin:0 auto 16mm; background:var(--paper); position:relative; page-break-after:always; box-shadow:0 12px 40px rgba(20,22,25,.12); }
+  .page:last-child { page-break-after:auto; }
+  .cover { display:flex; flex-direction:column; justify-content:space-between; background:#101318; color:#f8f7f1; }
+  .cover-mark { width:54px; height:54px; display:grid; place-items:center; border:1px solid rgba(200,255,61,.5); border-radius:15px; color:var(--accent); font-weight:800; letter-spacing:-.06em; }
+  .eyebrow { font-size:9px; letter-spacing:.18em; color:var(--muted); font-weight:700; }
+  .cover .eyebrow { color:rgba(255,255,255,.52); }
+  h1 { font-family:Georgia,"Times New Roman",serif; font-size:44px; line-height:1.02; letter-spacing:-.035em; margin:0 0 18px; max-width:13ch; font-weight:500; }
+  h2 { font-family:Georgia,"Times New Roman",serif; font-size:27px; letter-spacing:-.025em; margin:10mm 0 2.5mm; font-weight:500; }
+  .cover-sub { font-size:15px; line-height:1.55; color:rgba(255,255,255,.7); max-width:52ch; margin:0; }
+  dl { display:grid; grid-template-columns:repeat(3,1fr); gap:8mm; border-top:1px solid rgba(255,255,255,.14); padding-top:6mm; margin:0; }
+  dt { font-size:8px; letter-spacing:.16em; color:rgba(255,255,255,.45); text-transform:uppercase; margin-bottom:5px; }
+  dd { margin:0; font-size:12px; color:#fff; }
+  .cover-note { font-size:10px; color:rgba(255,255,255,.42); max-width:50ch; line-height:1.5; margin:0; }
+  .page-head,.page-foot { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:8px; letter-spacing:.13em; color:var(--muted); }
+  .brand { font-weight:700; }
+  .lede { font-size:11.5px; line-height:1.6; color:#545854; max-width:68ch; margin:0 0 6mm; }
+  figure { margin:0; border:1px solid var(--line); background:#f4f1e9; padding:3mm; }
+  figure img { display:block; width:100%; max-height:156mm; object-fit:contain; object-position:top center; }
+  .page-foot { position:absolute; left:20mm; right:20mm; bottom:12mm; border-top:1px solid var(--line); padding-top:3mm; }
+  @media print { html,body { background:#fff; } .page { margin:0; box-shadow:none; } }
+</style>
+</head>
+<body>${cover}${pages}</body>
+</html>`;
 }
 
 export interface ManagerOptions {
@@ -124,6 +204,7 @@ export class DeviceManager {
   private controlAttemptSerial: string | null = null;
   private demoGestureNotices = new Map<string, number>();
   private screenshotRoot: string | null = null;
+  private artefactRoot: string | null = null;
   private scrollBusy = false;
   private pendingScroll: { nx: number; ny: number; deltaX: number; deltaY: number } | null = null;
 
@@ -1179,6 +1260,8 @@ export class DeviceManager {
       deviceName: meta.deviceName,
       platform: meta.platform,
       thumbnail,
+      caption: meta.caption,
+      group: meta.group,
     };
   }
 
@@ -1214,6 +1297,10 @@ export class DeviceManager {
       const match = /^data:image\/(?:png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(request.dataUrl);
       if (!match) throw new Error('The screenshot data is not a PNG or JPEG.');
       image = nativeImage.createFromBuffer(Buffer.from(match[1], 'base64'));
+    } else if (request.fullWindow) {
+      const window = this.options.getWindow();
+      if (!window || window.isDestroyed()) throw new Error('The app window is not available.');
+      image = await window.webContents.capturePage();
     } else if (request.rect) {
       const window = this.options.getWindow();
       if (!window || window.isDestroyed()) throw new Error('The app window is not available.');
@@ -1249,21 +1336,26 @@ export class DeviceManager {
     const path = join(dir, id);
     await fs.writeFile(path, image.toPNG());
     const device = this.activeDevice;
+    const labelled = request.label?.trim();
     const meta: StoredScreenshot = {
       id,
       createdAt: now.getTime(),
       width: image.getSize().width,
       height: image.getSize().height,
-      deviceName: device?.name ?? 'Phone screen',
-      platform: device?.platform ?? null,
+      deviceName: labelled || device?.name || 'App screen',
+      platform: request.fullWindow ? null : (device?.platform ?? null),
+      caption: request.caption?.trim() || undefined,
+      group: request.group?.trim() || undefined,
     };
     const index = await this.readScreenshotIndex(dir);
     await this.writeScreenshotIndex(dir, [
       meta,
       ...index.items.filter((item) => item.id !== id),
     ]);
-    this.log('success', 'Screenshot saved', path);
-    this.toast('success', 'Screenshot saved', path);
+    if (!request.quiet) {
+      this.log('success', 'Screenshot saved', path);
+      this.toast('success', 'Screenshot saved', path);
+    }
     const shot = this.screenshotFromPath(path, meta);
     if (!shot) throw new Error('The screenshot could not be read back.');
     return shot;
@@ -1298,6 +1390,104 @@ export class DeviceManager {
   async revealScreenshotsFolder(): Promise<void> {
     const dir = await this.ensureScreenshotDir();
     await shell.openPath(dir);
+  }
+
+  // -------------------------------------------------------------------------
+  // Artefacts
+  // -------------------------------------------------------------------------
+
+  private async ensureArtefactDir(): Promise<string> {
+    if (this.artefactRoot) return this.artefactRoot;
+    const shots = await this.ensureScreenshotDir();
+    const preferred =
+      process.env.PHONEEXPLORER_ARTEFACT_DIR || join(dirname(shots), 'Artefacts');
+    try {
+      await fs.mkdir(preferred, { recursive: true });
+      this.artefactRoot = preferred;
+      return preferred;
+    } catch {
+      const fallback = join(this.options.dataDir, 'artefacts');
+      await fs.mkdir(fallback, { recursive: true });
+      this.artefactRoot = fallback;
+      return fallback;
+    }
+  }
+
+  async saveArtefact(input: ArtefactInput): Promise<ArtefactDocument> {
+    const sections = input.sections
+      .filter((section) => /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(section.image))
+      .slice(0, 80)
+      .map((section, index) => ({
+        id: section.id || `view-${index + 1}`,
+        title: section.title.slice(0, 120),
+        description: section.description.slice(0, 500),
+        image: section.image,
+      }));
+    if (sections.length === 0) throw new Error('The walkthrough has no screenshots.');
+    const createdAt = Date.now();
+    const dir = await this.ensureArtefactDir();
+    const doc: ArtefactDocument = {
+      version: 1,
+      title: input.title.slice(0, 120),
+      subtitle: input.subtitle.slice(0, 300),
+      deviceName: input.deviceName.slice(0, 120),
+      sections,
+      createdAt,
+      folder: dir,
+    };
+    const jsonPath = join(dir, 'artefact.json');
+    const htmlPath = join(dir, 'artefact.html');
+    await fs.writeFile(jsonPath, JSON.stringify(doc, null, 2), 'utf8');
+    await fs.writeFile(htmlPath, artefactHtml(doc, createdAt), 'utf8');
+    this.log('success', 'Artefact document saved', htmlPath);
+    if (!input.quiet) {
+      this.toast('success', 'Artefacts document ready', `${sections.length} views · Artefacts tab`);
+    }
+    return doc;
+  }
+
+  async getArtefact(): Promise<ArtefactDocument | null> {
+    const dir = await this.ensureArtefactDir();
+    try {
+      const raw = await fs.readFile(join(dir, 'artefact.json'), 'utf8');
+      const parsed = JSON.parse(raw) as Partial<ArtefactDocument>;
+      if (
+        parsed.version !== 1 ||
+        typeof parsed.title !== 'string' ||
+        typeof parsed.createdAt !== 'number' ||
+        !Array.isArray(parsed.sections)
+      ) {
+        return null;
+      }
+      return {
+        version: 1,
+        title: parsed.title,
+        subtitle: typeof parsed.subtitle === 'string' ? parsed.subtitle : '',
+        deviceName: typeof parsed.deviceName === 'string' ? parsed.deviceName : 'Device',
+        sections: parsed.sections.filter(
+          (section): section is ArtefactDocument['sections'][number] =>
+            Boolean(section) &&
+            typeof section.id === 'string' &&
+            typeof section.title === 'string' &&
+            typeof section.description === 'string' &&
+            typeof section.image === 'string',
+        ),
+        createdAt: parsed.createdAt,
+        folder: dir,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async openArtefact(): Promise<void> {
+    const dir = await this.ensureArtefactDir();
+    const error = await shell.openPath(join(dir, 'artefact.html'));
+    if (error) throw new Error(error);
+  }
+
+  async revealArtefact(): Promise<void> {
+    await shell.openPath(await this.ensureArtefactDir());
   }
 
   // -------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AppState,
+  ArtefactDocument,
+  ArtefactInput,
   FramePayload,
   KeyAction,
   NewPhoneModel,
@@ -36,7 +38,11 @@ export interface PhoneActions {
   pinch: (x: number, y: number, scale: number) => Promise<void>;
   press: (key: KeyAction) => Promise<void>;
   typeText: (text: string) => Promise<void>;
-  captureScreenshot: (request: ScreenshotRequest) => Promise<void>;
+  captureScreenshot: (request: ScreenshotRequest) => Promise<Screenshot | null>;
+  saveArtefact: (input: ArtefactInput) => Promise<ArtefactDocument | null>;
+  getArtefact: () => Promise<ArtefactDocument | null>;
+  openArtefact: () => Promise<void>;
+  revealArtefact: () => Promise<void>;
   listScreenshots: () => Promise<Screenshot[]>;
   getScreenshotsFolder: () => Promise<string>;
   loadScreenshot: (id: string) => Promise<string>;
@@ -208,12 +214,35 @@ export function usePhone(): {
     typeText: (text) => window.phone.typeText(text).catch(fail('Typing failed')),
     captureScreenshot: async (request) => {
       try {
-        await window.phone.captureScreenshot(request);
+        const shot = await window.phone.captureScreenshot(request);
         window.dispatchEvent(new Event('phone:screenshot'));
+        return shot;
       } catch (error) {
         fail('Screenshot failed')(error);
+        return null;
       }
     },
+    saveArtefact: async (input) => {
+      try {
+        const doc = await window.phone.saveArtefact(input);
+        window.dispatchEvent(new Event('phone:artefact'));
+        return doc;
+      } catch (error) {
+        fail('Could not save the Artefacts document')(error);
+        return null;
+      }
+    },
+    getArtefact: async () => {
+      try {
+        return await window.phone.getArtefact();
+      } catch (error) {
+        fail('Could not load Artefacts')(error);
+        return null;
+      }
+    },
+    openArtefact: () => window.phone.openArtefact().catch(fail('Could not open Artefacts')),
+    revealArtefact: () =>
+      window.phone.revealArtefact().catch(fail('Could not reveal Artefacts')),
     listScreenshots: async () => {
       try {
         return await window.phone.listScreenshots();

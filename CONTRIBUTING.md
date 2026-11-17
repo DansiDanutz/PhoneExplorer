@@ -25,6 +25,7 @@ npm run e2e
 npm run e2e:models
 npm run e2e:gestures
 npm run e2e:library
+npm run e2e:artefacts
 npm run e2e:real
 ```
 

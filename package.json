@@ -19,6 +19,7 @@
     "e2e:models": "npm run build && node scripts/e2e-models.mjs",
     "e2e:gestures": "npm run build && node scripts/e2e-gestures.mjs",
     "e2e:library": "npm run build && node scripts/e2e-library.mjs",
+    "e2e:artefacts": "npm run build && node scripts/e2e-artefacts.mjs",
     "e2e:real": "npm run build && node scripts/e2e-real.mjs",
     "showcase": "npm run build && node scripts/showcase.mjs",
     "icon": "node scripts/make-icon.mjs"

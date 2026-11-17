@@ -10,6 +10,7 @@ import {
   type MenuItemConstructorOptions,
 } from 'electron';
 import type {
+  ArtefactInput,
   KeyAction,
   NewPhoneModel,
   PhonePlatform,
@@ -255,6 +256,10 @@ function registerIpc(instance: DeviceManager): void {
   handle('phone:screenshot:delete', (id: string) => instance.deleteScreenshot(id));
   handle('phone:screenshot:reveal', (id: string) => instance.revealScreenshot(id));
   handle('phone:screenshot:folder', () => instance.revealScreenshotsFolder());
+  handle('phone:artefact:save', (input: ArtefactInput) => instance.saveArtefact(input));
+  handle('phone:artefact:get', () => instance.getArtefact());
+  handle('phone:artefact:open', () => instance.openArtefact());
+  handle('phone:artefact:reveal', () => instance.revealArtefact());
   handle('phone:store:open', (appId?: string) => instance.openStore(appId));
   handle('phone:store:search', (query: string) => instance.searchStore(query));
   handle('phone:app:install', (appId: string) => instance.installApp(appId));

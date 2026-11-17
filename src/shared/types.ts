@@ -224,6 +224,16 @@ export interface ScreenshotRect {
 export interface ScreenshotRequest {
   rect?: ScreenshotRect;
   dataUrl?: string;
+  /** Capture the whole app window instead of the phone stage. */
+  fullWindow?: boolean;
+  /** Human label shown in the Library and Artefacts document. */
+  label?: string;
+  /** One-line explanation of what this screen shows. */
+  caption?: string;
+  /** Group related captures, e.g. a walkthrough. */
+  group?: string;
+  /** Do not emit a toast for each capture in a batch. */
+  quiet?: boolean;
 }
 
 export interface Screenshot {
@@ -236,6 +246,30 @@ export interface Screenshot {
   deviceName: string;
   platform: PhonePlatform | null;
   thumbnail: string;
+  caption?: string;
+  group?: string;
+}
+
+export interface ArtefactSection {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+}
+
+export interface ArtefactInput {
+  title: string;
+  subtitle: string;
+  deviceName: string;
+  sections: ArtefactSection[];
+  /** Suppress the completion toast during a batch capture. */
+  quiet?: boolean;
+}
+
+export interface ArtefactDocument extends ArtefactInput {
+  version: 1;
+  createdAt: number;
+  folder: string;
 }
 
 export interface FramePayload {
@@ -285,6 +319,10 @@ export interface PhoneAPI {
   pinch(x: number, y: number, scale: number): Promise<void>;
   press(key: KeyAction): Promise<void>;
   captureScreenshot(request: ScreenshotRequest): Promise<Screenshot>;
+  saveArtefact(input: ArtefactInput): Promise<ArtefactDocument>;
+  getArtefact(): Promise<ArtefactDocument | null>;
+  openArtefact(): Promise<void>;
+  revealArtefact(): Promise<void>;
   listScreenshots(): Promise<Screenshot[]>;
   getScreenshotsFolder(): Promise<string>;
   loadScreenshot(id: string): Promise<string>;
