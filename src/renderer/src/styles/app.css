@@ -4283,7 +4283,7 @@ button.phone-side::before {
   inset: -7px -9px;
 }
 
-button.phone-side:hover {
+button.phone-side:not(.phone-side--shot):not(.phone-side--record):hover {
   background: var(--accent);
   box-shadow: 0 0 12px rgba(216, 255, 99, 0.45);
 }
@@ -4304,7 +4304,9 @@ button.phone-side:focus-visible {
   border-radius: 24px;
   background: transparent;
   box-shadow: none;
-  transition: transform 0.14s var(--ease), filter 0.14s var(--ease);
+  transition:
+    transform 0.18s var(--ease),
+    filter 0.18s var(--ease);
 }
 
 .phone-side--shot::before {
@@ -4323,11 +4325,27 @@ button.phone-side:focus-visible {
   transform: translate(-50%, -50%);
 }
 
-.phone-side--shot:hover {
-  transform: scale(1.04);
+.phone-side--shot:hover,
+.phone-side--shot:focus-visible {
+  transform: translateY(-1px) scale(1.02);
   background: transparent;
-  filter: drop-shadow(0 0 12px rgba(190, 255, 120, 0.45));
+  border-color: transparent;
   box-shadow: none;
+  filter: brightness(1.07) saturate(1.05)
+    drop-shadow(0 0 2px rgba(216, 255, 99, 0.32))
+    drop-shadow(0 0 13px rgba(190, 255, 120, 0.32));
+}
+
+.phone-side--shot:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(216, 255, 99, 0.55),
+    0 0 18px rgba(216, 255, 99, 0.14);
+}
+
+.phone-side--shot:active {
+  transform: translateY(0) scale(0.99);
+  filter: brightness(0.97) saturate(1.02);
 }
 
 /* Screenshot library */
@@ -4980,21 +4998,32 @@ button.phone-side:focus-visible {
 }
 
 .phone-side--record:hover:not(:disabled),
-button.phone-side--record:hover:not(:disabled) {
-  transform: scale(1.04);
-  background: var(--accent);
-  box-shadow: 0 0 12px rgba(216, 255, 99, 0.45);
-  filter: drop-shadow(0 0 12px rgba(190, 255, 120, 0.45));
+button.phone-side--record:hover:not(:disabled),
+button.phone-side--record:focus-visible:not(:disabled) {
+  transform: translateY(-1px) scale(1.02);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  filter: brightness(1.07) saturate(1.05)
+    drop-shadow(0 0 2px rgba(216, 255, 99, 0.32))
+    drop-shadow(0 0 13px rgba(190, 255, 120, 0.32));
 }
 
-.phone-side--record:focus,
-.phone-side--record:focus-visible,
-button.phone-side--record:focus-visible {
+.phone-side--record:focus {
   outline: none;
 }
 
-.phone-side--record:focus-visible {
-  filter: drop-shadow(0 0 10px rgba(216, 255, 99, 0.35));
+.phone-side--record:focus-visible,
+button.phone-side--record:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(216, 255, 99, 0.55),
+    0 0 18px rgba(216, 255, 99, 0.14);
+}
+
+.phone-side--record:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+  filter: brightness(0.97) saturate(1.02);
 }
 
 button.phone-side--record.is-recording:hover {
