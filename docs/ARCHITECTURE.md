@@ -158,8 +158,10 @@ wheel direction.
 
 ## Artefacts and app understanding
 
-`Artefacts` is the tab immediately after Library. **Record an artefact** starts Android
-`screenrecord` on the active phone and a two-second `screencap` loop. The user moves the phone
+`Artefacts` is the tab immediately after Library. The same recording action is available as the
+red **Record** pill directly under the neon Screenshots button on the phone margin.
+**Record an artefact** starts Android `screenrecord` on the active phone and a two-second
+`screencap` loop. The user moves the phone
 through the app; the recorder never sends a tap. Both the MP4 and the live screenshots are kept
 under `~/Pictures/PhoneExplorer/Recordings` and `~/Pictures/PhoneExplorer`.
 

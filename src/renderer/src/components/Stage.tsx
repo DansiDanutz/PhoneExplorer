@@ -13,6 +13,9 @@ interface StageProps {
   focusMode: boolean;
   onToggleFocus: () => void;
   onOpenGuide: () => void;
+  recording: boolean;
+  recordingProcessing: boolean;
+  onToggleRecording: () => void;
 }
 
 export function Stage({
@@ -23,6 +26,9 @@ export function Stage({
   focusMode,
   onToggleFocus,
   onOpenGuide,
+  recording,
+  recordingProcessing,
+  onToggleRecording,
 }: StageProps): ReactElement {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [text, setText] = useState('');
@@ -202,6 +208,9 @@ export function Stage({
             onPinch={handlePinch}
             onPress={(key) => void actions.press(key)}
             onCaptureScreenshot={(request) => void actions.captureScreenshot(request)}
+            recording={recording}
+            recordingProcessing={recordingProcessing}
+            onToggleRecording={onToggleRecording}
             onStartPreview={() => void actions.startPreview()}
           />
         </div>

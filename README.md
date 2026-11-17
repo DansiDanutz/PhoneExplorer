@@ -156,7 +156,8 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **GGPoker / PlayGG** is in the catalog as an 18+ app. Its Get button opens the official
   Google Play listing `com.nsus.poker.prodggpcom` or App Store ID `1504833971`. The poker
   table visible in demo mode is a simulated preview, not the real app.
-- **App understanding** opens **Artefacts** (⌘5). **Record an artefact** starts a native
+- **App understanding** opens **Artefacts** (⌘5), or use the red **Record** pill directly
+  under the neon Screenshots button on the phone margin. **Record an artefact** starts a native
   Android `screenrecord` session and also captures a full-resolution phone screenshot every two
   seconds. Move through the phone yourself — PhoneExplorer never taps the app. When you stop,
   ffmpeg extracts scene/key frames, Tesseract labels the distinct screens, and the result is

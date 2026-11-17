@@ -320,6 +320,11 @@ export default function App(): React.ReactElement {
           focusMode={focusMode}
           onToggleFocus={() => setFocusMode((value) => !value)}
           onOpenGuide={() => setGuideOpen(true)}
+          recording={recording}
+          recordingProcessing={recordingProcessing}
+          onToggleRecording={() =>
+            recording ? void stopPhoneRecording() : void startPhoneRecording()
+          }
         />
 
         {!focusMode ? (

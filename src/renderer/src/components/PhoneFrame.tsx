@@ -22,6 +22,9 @@ interface PhoneFrameProps {
   onPinch: (x: number, y: number, scale: number) => void;
   onPress: (key: KeyAction) => void;
   onCaptureScreenshot: (request: ScreenshotRequest) => void;
+  recording: boolean;
+  recordingProcessing: boolean;
+  onToggleRecording: () => void;
   onStartPreview: () => void;
 }
 
@@ -84,6 +87,9 @@ export function PhoneFrame({
   onPinch,
   onPress,
   onCaptureScreenshot,
+  recording,
+  recordingProcessing,
+  onToggleRecording,
   onStartPreview,
 }: PhoneFrameProps): ReactElement {
   const screenRef = useRef<HTMLDivElement>(null);
@@ -373,6 +379,17 @@ export function PhoneFrame({
           aria-label="Save a screenshot"
         >
           <img src={screenshotButton} alt="" draggable={false} />
+        </button>
+        <button
+          type="button"
+          className={`phone-side phone-side--record ${recording ? 'is-recording' : ''}`}
+          onClick={onToggleRecording}
+          disabled={recordingProcessing}
+          title={recording ? 'Stop recording' : 'Record the phone'}
+          aria-label={recording ? 'Stop recording' : 'Record the phone'}
+        >
+          <span className="record-dot" />
+          <span>{recordingProcessing ? 'Saving' : recording ? 'Stop' : 'Record'}</span>
         </button>
         <div className="phone-bezel">
           <div
