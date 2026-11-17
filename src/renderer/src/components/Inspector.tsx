@@ -33,7 +33,13 @@ function InstallButton({
   const busy = progress && progress.phase !== 'done' && progress.phase !== 'failed';
   if (installed || progress?.phase === 'done') {
     return (
-      <button type="button" className="get-btn is-open" onClick={onOpen} title={`Open ${app.name}`}>
+      <button
+        type="button"
+        className="get-btn is-open"
+        onClick={onOpen}
+        title={`Open ${app.name}`}
+        aria-label={`Open ${app.name}`}
+      >
         Open
       </button>
     );
@@ -51,6 +57,7 @@ function InstallButton({
         className="get-btn is-progress"
         onClick={onGet}
         title={progress.message}
+        aria-label={`Installing ${app.name}`}
       >
         <span className="mini-spinner" />
         {label}
@@ -63,6 +70,7 @@ function InstallButton({
       className={`get-btn ${progress?.phase === 'failed' ? 'is-retry' : ''}`}
       onClick={onGet}
       title={`Get ${app.name} — opens the store on the phone`}
+      aria-label={`Install ${app.name}`}
     >
       {progress?.phase === 'failed' ? 'Retry' : 'Get'}
     </button>

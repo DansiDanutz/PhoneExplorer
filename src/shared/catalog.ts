@@ -272,6 +272,25 @@ export const CATALOG: CatalogApp[] = [
     size: '132 MB',
     scene: 'ride',
   },
+  {
+    id: 'ggpoker',
+    name: 'GGPoker',
+    publisher: 'NSUS Limited',
+    category: 'Games',
+    tagline: 'PlayGG · Real online poker',
+    description:
+      'The official GGPoker mobile app (PlayGG in Romania). This opens the official Google Play listing or App Store page; the poker table in the demo is only a simulated preview. 18+.',
+    color: '#c8ff3d',
+    ink: '#0b1407',
+    mark: 'game',
+    androidPackage: 'com.nsus.poker.prodggpcom',
+    iosAppId: '1504833971',
+    iosBundleId: 'com.nsus.ggpcom',
+    rating: 4.4,
+    installs: '10M+',
+    size: '120 MB',
+    scene: 'poker',
+  },
 ];
 
 export const CATALOG_BY_ID: Record<string, CatalogApp> = Object.fromEntries(
@@ -317,6 +336,13 @@ export function storeLink(target: StoreTarget): { deep: string; web: string } {
       return {
         deep: `itms-apps://apps.apple.com/app/id${app.iosAppId}`,
         web: `https://apps.apple.com/app/id${app.iosAppId}`,
+      };
+    }
+    if (app.storeQuery) {
+      const term = encodeURIComponent(app.storeQuery);
+      return {
+        deep: `market://search?q=${term}`,
+        web: `https://play.google.com/store/search?q=${term}&c=apps`,
       };
     }
     return {

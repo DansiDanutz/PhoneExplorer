@@ -84,7 +84,8 @@ export type DemoScene =
   | 'travel'
   | 'mail'
   | 'workspace'
-  | 'ride';
+  | 'ride'
+  | 'poker';
 
 export interface CatalogApp {
   id: string;
@@ -103,6 +104,8 @@ export interface CatalogApp {
   installs: string;
   size: string;
   scene: DemoScene;
+  /** Prefer a store search for region-restricted listings. */
+  storeQuery?: string;
 }
 
 export interface InstalledApp {

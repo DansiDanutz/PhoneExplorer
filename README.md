@@ -152,6 +152,9 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
   swipes, **hold** long-presses, **right-click** is Back and **middle-click** is Home.
   Mouse Back/Forward buttons also send Back/Home. If scrolling feels backwards, turn on
   **Reverse scroll** in Settings.
+- **GGPoker / PlayGG** is in the catalog as an 18+ app. Its Get button opens the official
+  Google Play listing `com.nsus.poker.prodggpcom` or App Store ID `1504833971`. The poker
+  table visible in demo mode is a simulated preview, not the real app.
 - **Screenshot** with the camera button on the phone’s right margin, or **⌘S**. Every capture
   lands in **Library** (⌘4), where you can preview, reveal and delete it. The Library header
   shows the exact folder; normally `~/Pictures/PhoneExplorer`.
@@ -232,7 +235,7 @@ npm run dist        # electron-builder: dmg + zip (macOS)
 
 ### Testing strategy
 
-- **Unit / scene tests** render every demo screen (home, store, detail and all 14 app
+- **Unit / scene tests** render every demo screen (home, store, detail and all 15 app
   scenes on both platforms) and assert well-formed output. The SVG files are also checked
   with `xmllint` in development.
 - **Demo E2E** drives the real renderer with Playwright: connect, store, install, open,

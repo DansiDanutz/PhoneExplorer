@@ -1437,6 +1437,71 @@ function sceneRide(input: SceneInput): string {
   </g>`;
 }
 
+function scenePoker(input: SceneInput): string {
+  const { app, time, battery, platform, hot } = input;
+  const card = (x: number, y: number, rank: string, suit: string, faceUp = true): string => {
+    if (!faceUp) {
+      return `${rr(x, y, 38, 54, 6, '#15271f')}<rect x="${x + 4}" y="${y + 4}" width="30" height="46" rx="4" fill="none" stroke="rgba(216,255,99,.28)"/><text x="${x + 19}" y="${y + 32}" font-family="${FONT}" font-size="16" fill="rgba(216,255,99,.45)" text-anchor="middle">GG</text>`;
+    }
+    const red = suit === '♥' || suit === '♦';
+    const ink = red ? '#b0192c' : '#151a1f';
+    return `<g>${rr(x, y, 38, 54, 6, '#f7f2e6')}
+      ${text(x + 5, y + 13, 10, 700, ink, rank)}
+      ${text(x + 5, y + 24, 10, 500, ink, suit)}
+      ${text(x + 19, y + 44, 20, 500, ink, suit, 'text-anchor="middle"')}
+    </g>`;
+  };
+  const community = ['A♣', 'K♦', '10♠', '7♥', '2♣'];
+  const board = community
+    .map((value, i) => card(84 + i * 47, 300, value.slice(0, -1), value.slice(-1)))
+    .join('');
+  const seats = [
+    { x: 62, y: 374, name: 'Maya', stack: '$12.40' },
+    { x: 340, y: 374, name: 'Theo', stack: '$8.90' },
+    { x: 100, y: 500, name: 'Lena', stack: '$21.10' },
+    { x: 302, y: 500, name: 'You', stack: '$15.00' },
+  ]
+    .map(
+      (seat) => `<g>
+        <circle cx="${seat.x}" cy="${seat.y}" r="20" fill="${seat.name === 'You' ? app.color : '#1b2d25'}" stroke="rgba(216,255,99,.28)"/>
+        ${text(seat.x, seat.y + 3.5, 9, 700, seat.name === 'You' ? app.ink : '#ffffff', seat.name, 'text-anchor="middle"')}
+        ${mono(seat.x, seat.y + 33, 7.5, 'rgba(255,255,255,.58)', seat.stack, 'text-anchor="middle"')}
+      </g>`,
+    )
+    .join('');
+  return `<g>
+    <rect width="402" height="874" fill="#06120c"/>
+    <circle cx="330" cy="120" r="210" fill="${app.color}" opacity=".22"/>
+    <circle cx="40" cy="760" r="190" fill="#1e6a46" opacity=".28"/>
+    ${statusBar(platform, false, time, battery)}
+    ${sceneHeader(input, app.name, 'Table 12 · $0.50 / $1.00')}
+    <ellipse cx="201" cy="420" rx="184" ry="152" fill="#0b3b28" stroke="#2b7a55" stroke-width="2"/>
+    <ellipse cx="201" cy="420" rx="162" ry="132" fill="none" stroke="rgba(216,255,99,.14)"/>
+    ${text(201, 272, 8.5, 700, 'rgba(216,255,99,.62)', 'NO LIMIT HOLD’EM', 'text-anchor="middle" letter-spacing="1.4"')}
+    ${text(201, 288, 11, 650, 'rgba(255,255,255,.75)', 'POT  $4.50', 'text-anchor="middle"')}
+    ${board}
+    ${seats}
+    ${text(201, 590, 9, 600, 'rgba(255,255,255,.45)', 'YOUR HAND', 'text-anchor="middle" letter-spacing="1.2"')}
+    ${card(152, 606, 'A', '♠')}
+    ${card(212, 606, 'K', '♠')}
+    <g>
+      ${rr(28, 690, 102, 42, 21, 'rgba(255,255,255,.08)')}
+      ${text(79, 716, 11, 650, 'rgba(255,255,255,.7)', 'Fold', 'text-anchor="middle"')}
+      ${rr(140, 690, 122, 42, 21, 'rgba(255,255,255,.14)')}
+      ${text(201, 716, 11, 650, '#ffffff', 'Call  $1.00', 'text-anchor="middle"')}
+      ${rr(272, 690, 102, 42, 21, app.color)}
+      ${text(323, 716, 11, 750, app.ink, 'Raise', 'text-anchor="middle"')}
+    </g>
+    ${sceneFooter(input, [
+      { label: 'Table', mark: 'game' },
+      { label: 'Tourneys', mark: 'play' },
+      { label: 'Cashier', mark: 'grid' },
+      { label: 'More', mark: 'gear' },
+    ])}
+    ${hot({ x: 20, y: 60, w: 38, h: 38, label: 'Back to home screen', action: 'home' })}
+  </g>`;
+}
+
 const SCENES: Record<CatalogApp['scene'], (input: SceneInput) => string> = {
   music: sceneMusic,
   social: sceneSocial,
@@ -1449,6 +1514,7 @@ const SCENES: Record<CatalogApp['scene'], (input: SceneInput) => string> = {
   mail: sceneMail,
   workspace: sceneWorkspace,
   ride: sceneRide,
+  poker: scenePoker,
 };
 
 // ---------------------------------------------------------------------------
@@ -1685,7 +1751,7 @@ export class DemoDevice {
         platform: this.platform,
         time,
         battery: this.battery,
-        dark: ['music', 'video', 'chat', 'ride'].includes(app.scene) || app.id === 'x',
+        dark: ['music', 'video', 'chat', 'ride', 'poker'].includes(app.scene) || app.id === 'x',
         hot,
       });
     }

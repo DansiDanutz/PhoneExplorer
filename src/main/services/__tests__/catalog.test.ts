@@ -32,6 +32,21 @@ describe('catalog and store links', () => {
     expect(searchCatalog('zzzz')).toHaveLength(0);
   });
 
+  it('finds GGPoker and PlayGG in the catalog', () => {
+    expect(searchCatalog('GGPoker').map((app) => app.id)).toContain('ggpoker');
+    expect(searchCatalog('PlayGG').map((app) => app.id)).toContain('ggpoker');
+    expect(CATALOG_BY_ID.ggpoker.iosBundleId).toBe('com.nsus.ggpcom');
+  });
+
+  it('uses the official GGPoker store listings', () => {
+    expect(storeLink({ platform: 'android', appId: 'ggpoker' }).deep).toBe(
+      'market://details?id=com.nsus.poker.prodggpcom',
+    );
+    expect(storeLink({ platform: 'ios', appId: 'ggpoker' }).deep).toBe(
+      'itms-apps://apps.apple.com/app/id1504833971',
+    );
+  });
+
   it('builds Android app, search and home links', () => {
     expect(storeLink({ platform: 'android', appId: 'spotify' })).toEqual({
       deep: 'market://details?id=com.spotify.music',
@@ -73,6 +88,17 @@ describe('demo install state machine', () => {
     const frame = device.render(start + 4100);
     expect(frame.svg).toContain('Midnight City');
     expect(frame.hotspots.some((spot) => spot.label === 'Back to home screen')).toBe(true);
+  });
+
+  it('installs GGPoker and opens the poker table', () => {
+    const device = new DemoDevice('android');
+    const start = 5_000_000;
+    expect(device.startInstall('ggpoker', start)).toBe(true);
+    device.tick(start + 5000);
+    expect(device.openApp('ggpoker')).toBe(true);
+    const frame = device.render(start + 5100);
+    expect(frame.svg).toContain('POT');
+    expect(frame.svg).toContain('GGPoker');
   });
 
   it('does not launch an app that is not installed', () => {
