@@ -212,7 +212,7 @@ export function Artefacts({ actions, onRecord, onStop, recording, processing }: 
           Loading document…
         </div>
       ) : !doc ? (
-        <div className="empty-state">
+        <div className="empty-state is-card">
           <span className="empty-icon">
             <Icon name="layers" size={22} />
           </span>
@@ -259,7 +259,13 @@ export function Artefacts({ actions, onRecord, onStop, recording, processing }: 
                 </div>
                 <h4>{item.title}</h4>
                 <p>{item.description}</p>
-                <img src={item.image} alt={item.title} />
+                <div className="artefact-page-media">
+                  <img src={item.image} alt={item.title} />
+                  <span className="artefact-page-open">
+                    <Icon name="zoom-in" size={12} />
+                    Open page
+                  </span>
+                </div>
                 <div className="artefact-page-foot">
                   <span>{doc.deviceName}</span>
                   <span>{index + 1} / {doc.sections.length}</span>
@@ -314,7 +320,9 @@ export function Artefacts({ actions, onRecord, onStop, recording, processing }: 
                   aria-pressed={isSelected}
                 >
                   <img src={shot.thumbnail} alt="" />
-                  <span className="picker-check">{isSelected ? '✓' : ''}</span>
+                  <span className="picker-check">
+                    {isSelected ? <Icon name="check" size={12} /> : null}
+                  </span>
                   <span className="picker-caption">
                     {shot.caption || shot.deviceName || shot.name}
                   </span>

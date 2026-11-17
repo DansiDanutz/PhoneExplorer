@@ -20,7 +20,7 @@ export function clockTime(ts: number): string {
 export function levelTone(level: ActivityLevel): string {
   switch (level) {
     case 'success':
-      return 'ok';
+      return 'success';
     case 'warn':
       return 'warn';
     case 'error':

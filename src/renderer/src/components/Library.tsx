@@ -69,7 +69,10 @@ export function Library({ actions, onDiscover }: LibraryProps): ReactElement {
       <div className="panel-head">
         <div>
           <div className="eyebrow">SCREEN LIBRARY</div>
-          <h2>Screenshots</h2>
+          <h2>
+            Screenshots
+            <span className="head-count">{items?.length ?? 0}</span>
+          </h2>
         </div>
         <div className="row gap-6">
           <button
@@ -92,9 +95,9 @@ export function Library({ actions, onDiscover }: LibraryProps): ReactElement {
           </button>
         </div>
       </div>
-      <p className="panel-sub">
-        {items?.length ?? 0} saved ·{' '}
-        <span className="mono" title={folder || undefined}>
+      <p className="panel-sub library-sub">
+        <span>Saved to</span>{' '}
+        <span className="mono library-path" title={folder || undefined}>
           {folder ? folder.replace(/^\/Users\/[^/]+/, '~') : '~/Pictures/PhoneExplorer'}
         </span>
       </p>
@@ -131,6 +134,9 @@ export function Library({ actions, onDiscover }: LibraryProps): ReactElement {
             >
               <span className="shot-thumb">
                 <img src={shot.thumbnail} alt={`Screenshot of ${shot.deviceName}`} />
+                <span className="shot-zoom" aria-hidden="true">
+                  <Icon name="zoom-in" size={13} />
+                </span>
               </span>
               <span className="shot-copy">
                 <strong>{shot.deviceName}</strong>

@@ -17,10 +17,21 @@
   --line-strong: rgba(255, 255, 255, 0.115);
   --line-bright: rgba(255, 255, 255, 0.19);
 
+  /* shadcn-style semantic surfaces: cards, popovers and controls share one
+     quiet elevation scale so every panel reads as part of the same system. */
+  --card: #0d1014;
+  --card-hover: #11151b;
+  --card-raised: #141920;
+  --control: rgba(255, 255, 255, 0.035);
+  --control-hover: rgba(255, 255, 255, 0.07);
+  --ring: rgba(216, 255, 99, 0.42);
+  --ring-wide: 0 0 0 3px rgba(216, 255, 99, 0.1);
+  --radius-card: 12px;
+
   --text: #eef1f5;
-  --text-2: #b2bac6;
-  --text-3: #7e8795;
-  --text-4: #59626f;
+  --text-2: #b6bec9;
+  --text-3: #8a93a1;
+  --text-4: #737d8b;
 
   --accent: #d8ff63;
   --accent-2: #bff23d;
@@ -152,7 +163,7 @@ ol {
 }
 
 :focus-visible {
-  outline: 2px solid rgba(216, 255, 99, 0.7);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 
