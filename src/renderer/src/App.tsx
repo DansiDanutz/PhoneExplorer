@@ -322,6 +322,7 @@ export default function App(): React.ReactElement {
           onOpenGuide={() => setGuideOpen(true)}
           recording={recording}
           recordingProcessing={recordingProcessing}
+          recordingElapsed={recordingElapsed}
           onToggleRecording={() =>
             recording ? void stopPhoneRecording() : void startPhoneRecording()
           }

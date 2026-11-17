@@ -10,6 +10,7 @@ import type { DeviceInfo, FramePayload, KeyAction, ScreenshotRequest } from '@sh
 import { shade } from '../lib/format';
 import { Icon } from '../lib/icons';
 import screenshotButton from '../assets/neon-screenshots-button.png';
+import recordButton from '../assets/neon-record-idle.png';
 
 interface PhoneFrameProps {
   device: DeviceInfo;
@@ -24,6 +25,7 @@ interface PhoneFrameProps {
   onCaptureScreenshot: (request: ScreenshotRequest) => void;
   recording: boolean;
   recordingProcessing: boolean;
+  recordingElapsed: number;
   onToggleRecording: () => void;
   onStartPreview: () => void;
 }
@@ -89,6 +91,7 @@ export function PhoneFrame({
   onCaptureScreenshot,
   recording,
   recordingProcessing,
+  recordingElapsed,
   onToggleRecording,
   onStartPreview,
 }: PhoneFrameProps): ReactElement {
@@ -388,8 +391,18 @@ export function PhoneFrame({
           title={recording ? 'Stop recording' : 'Record the phone'}
           aria-label={recording ? 'Stop recording' : 'Record the phone'}
         >
-          <span className="record-dot" />
-          <span>{recordingProcessing ? 'Saving' : recording ? 'Stop' : 'Record'}</span>
+          {recording || recordingProcessing ? (
+            <span className="record-stop-ui">
+              <span className="record-stop-icon" />
+              <span>
+                {recordingProcessing
+                  ? 'Saving…'
+                  : `Stop · ${String(Math.floor(recordingElapsed / 60)).padStart(2, '0')}:${String(recordingElapsed % 60).padStart(2, '0')}`}
+              </span>
+            </span>
+          ) : (
+            <img src={recordButton} alt="" draggable={false} />
+          )}
         </button>
         <div className="phone-bezel">
           <div

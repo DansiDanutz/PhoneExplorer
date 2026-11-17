@@ -15,6 +15,7 @@ interface StageProps {
   onOpenGuide: () => void;
   recording: boolean;
   recordingProcessing: boolean;
+  recordingElapsed: number;
   onToggleRecording: () => void;
 }
 
@@ -28,6 +29,7 @@ export function Stage({
   onOpenGuide,
   recording,
   recordingProcessing,
+  recordingElapsed,
   onToggleRecording,
 }: StageProps): ReactElement {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -210,6 +212,7 @@ export function Stage({
             onCaptureScreenshot={(request) => void actions.captureScreenshot(request)}
             recording={recording}
             recordingProcessing={recordingProcessing}
+            recordingElapsed={recordingElapsed}
             onToggleRecording={onToggleRecording}
             onStartPreview={() => void actions.startPreview()}
           />
