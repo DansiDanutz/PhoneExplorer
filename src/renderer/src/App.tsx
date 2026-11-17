@@ -70,6 +70,28 @@ function StatusBar({
   );
 }
 
+async function shrinkScreenshot(dataUrl: string, width = 520): Promise<string> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, width / Math.max(1, image.width));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) {
+        resolve(dataUrl);
+        return;
+      }
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
+}
+
 export default function App(): React.ReactElement {
   const { state, frame, toasts, dismissToast, actions, frameAge } = usePhone();
   const [tab, setTab] = useState<InspectorTab>('discover');
@@ -236,14 +258,6 @@ export default function App(): React.ReactElement {
         await actions.tap(step.x, step.y);
         await new Promise((resolve) => window.setTimeout(resolve, 1200));
         if (autoCancel.current) return;
-        if (step.label !== 'Lobby') {
-          await actions.capturePhoneScreen({
-            label: `Auto · ${step.label}`,
-            caption: `Auto walkthrough: GGPoker ${step.label}. The tap and screenshot were taken inside the phone.`,
-            group: 'recording',
-            quiet: true,
-          });
-        }
       }
       if (!autoCancel.current) await stopPhoneRecording();
     } catch (error) {
@@ -262,8 +276,10 @@ export default function App(): React.ReactElement {
   ): Promise<void> => {
     const sections: ArtefactSection[] = [];
     const seen: Array<Set<string>> = [];
-    for (const shot of shots.slice(0, 80)) {
-      if (sections.length >= 40) break;
+    const direct = shots.filter((shot) => !shot.deviceName.startsWith('Video frame'));
+    const candidates = direct.length >= 3 ? direct : shots;
+    for (const shot of candidates.slice(0, 80)) {
+      if (sections.length >= 24) break;
       const boxes = await actions.ocrScreenshot(shot.id);
       const tokens = new Set(
         boxes
@@ -276,13 +292,14 @@ export default function App(): React.ReactElement {
           const union = new Set([...previous, ...tokens]);
           let intersection = 0;
           for (const token of tokens) if (previous.has(token)) intersection += 1;
-          return union.size > 0 && intersection / union.size >= 0.82;
+          return union.size > 0 && intersection / union.size >= 0.88;
         });
         if (duplicate) continue;
         seen.push(tokens);
       }
-      const image = await actions.loadScreenshot(shot.id);
-      if (!image) continue;
+      const rawImage = await actions.loadScreenshot(shot.id);
+      if (!rawImage) continue;
+      const image = await shrinkScreenshot(rawImage);
       const title =
         boxes
           .map((box) => box.text.trim())

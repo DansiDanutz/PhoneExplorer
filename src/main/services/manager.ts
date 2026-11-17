@@ -1383,7 +1383,6 @@ export class DeviceManager {
       }
     });
     this.log('info', 'Phone recording started', local);
-    this.toast('info', 'Recording the phone', 'Move through the app; screenshots are captured as you go.');
     return { startedAt, videoPath: local };
   }
 

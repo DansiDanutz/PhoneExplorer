@@ -2837,14 +2837,32 @@
 
 .toasts {
   position: fixed;
-  right: 16px;
-  bottom: 38px;
+  left: 302px;
+  right: auto;
+  bottom: 42px;
   z-index: 90;
-  width: 336px;
+  width: 220px;
   display: flex;
   flex-direction: column;
   gap: 7px;
   pointer-events: none;
+}
+
+.app.is-focus .toasts {
+  left: 18px;
+  width: 260px;
+}
+
+.app.is-focus .walkthrough-hud {
+  left: 18px;
+}
+
+@media (max-width: 720px) {
+  .toasts,
+  .walkthrough-hud {
+    left: 12px;
+    width: min(260px, calc(100vw - 24px));
+  }
 }
 
 .toast {
@@ -4427,13 +4445,15 @@ button.phone-side:focus-visible {
 /* Walkthrough progress */
 .walkthrough-hud {
   position: fixed;
-  right: 24px;
-  bottom: 42px;
+  left: 302px;
+  right: auto;
+  bottom: 116px;
   z-index: 110;
-  display: flex;
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  width: min(360px, calc(100vw - 48px));
+  gap: 7px 9px;
+  width: 220px;
   padding: 10px 11px;
   border: 1px solid rgba(216, 255, 99, 0.28);
   border-radius: 13px;
@@ -4454,7 +4474,7 @@ button.phone-side:focus-visible {
 
 .walkthrough-copy {
   display: flex;
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
   flex-direction: column;
   gap: 2px;
@@ -4472,7 +4492,8 @@ button.phone-side:focus-visible {
 }
 
 .walkthrough-stop {
-  flex: 0 0 auto;
+  grid-column: 1 / -1;
+  width: 100%;
   padding: 7px 12px;
   border: 1px solid rgba(255, 115, 115, 0.28);
   border-radius: 8px;
@@ -4497,6 +4518,7 @@ button.phone-side:focus-visible {
 }
 
 .recording-dot {
+  grid-row: 1;
   flex: 0 0 auto;
   width: 9px;
   height: 9px;
@@ -4529,7 +4551,9 @@ button.phone-side:focus-visible {
   justify-content: center;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
   transition: transform 0.14s var(--ease), filter 0.14s var(--ease);
 }
 
