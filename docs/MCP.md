@@ -111,3 +111,16 @@ npm run e2e:mcp
 
 This launches the app with an isolated data directory, starts the MCP server,
 initializes the protocol, lists tools and calls `phone_status`.
+
+## Confirmed status on this machine
+
+- Claude Desktop: **connected**, `phoneexplorer` loaded with **15 tools**.
+- Claude Code: configs and `.mcp.json` are registered. Claude Code 2.1.322's
+  stdio `server/discover` probe is the blocker; `MCP_PROTOCOL_NEGOTIATION=legacy`
+  is set in `~/.claude/settings.json`. Restart Claude Code after changing it.
+  In this environment headless `claude -p` still stalled even with an official
+  SDK test server, so Claude Desktop is the confirmed working path.
+- Codex: `phoneexplorer` is present and enabled in
+  `~/.codex/config.toml`; `codex mcp get phoneexplorer` resolves it.
+- Generic MCP clients: server validated with the official MCP SDK client
+  (`tools: 15`).
