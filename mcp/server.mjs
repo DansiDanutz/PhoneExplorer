@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -75,7 +76,97 @@ function errorResult(error) {
   };
 }
 
-const tools = [
+const AGENT_DESKTOP_CANDIDATES = [
+  process.env.AGENT_DESKTOP_BIN,
+  '/Users/davidai/.npm-global/bin/agent-desktop',
+  '/opt/homebrew/bin/agent-desktop',
+  '/usr/local/bin/agent-desktop',
+  join(homedir(), '.npm-global', 'bin', 'agent-desktop'),
+  'agent-desktop',
+].filter(Boolean);
+
+let desktop = null;
+
+async function startAgentDesktop() {
+  for (const bin of AGENT_DESKTOP_CANDIDATES) {
+    if (bin.includes('/') && !existsSync(bin)) continue;
+    try {
+      const child = spawn(bin, ['mcp'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
+      });
+      const pending = new Map();
+      let seq = 0;
+      let buffer = '';
+      const rl = readline.createInterface({ input: child.stdout });
+      rl.on('line', (line) => {
+        try {
+          const message = JSON.parse(line);
+          const resolve = pending.get(message.id);
+          if (resolve) {
+            pending.delete(message.id);
+            resolve(message);
+          }
+        } catch {
+          // Ignore non-JSON diagnostics; agent-desktop logs to stderr.
+        }
+      });
+      child.stderr.on('data', (chunk) => {
+        process.stderr.write(`[agent-desktop] ${String(chunk)}`);
+      });
+      child.once('error', () => undefined);
+      const request = (method, params) =>
+        new Promise((resolve, reject) => {
+          const id = `desktop-${++seq}`;
+          const timer = setTimeout(() => {
+            pending.delete(id);
+            reject(new Error(`agent-desktop ${method} timed out`));
+          }, 30_000);
+          pending.set(id, (message) => {
+            clearTimeout(timer);
+            if (message.error) reject(new Error(message.error.message || 'agent-desktop error'));
+            else resolve(message.result);
+          });
+          child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+        });
+      await request('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'phoneexplorer-mcp', version: '0.1.0' },
+      });
+      child.stdin.write(
+        JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n',
+      );
+      const listed = await request('tools/list', {});
+      const desktopTools = Array.isArray(listed?.tools)
+        ? listed.tools.filter((tool) => tool && typeof tool.name === 'string')
+        : [];
+      if (desktopTools.length === 0) {
+        child.kill('SIGTERM');
+        continue;
+      }
+      child.once('exit', () => {
+        desktop = null;
+      });
+      process.stderr.write(`[agent-desktop] connected (${desktopTools.length} tools)\n`);
+      return {
+        child,
+        tools: desktopTools,
+        call: async (name, args) => {
+          const result = await request('tools/call', { name, arguments: args || {} });
+          return result;
+        },
+      };
+    } catch (error) {
+      process.stderr.write(
+        `[agent-desktop] ${bin}: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+  }
+  return null;
+}
+
+const localTools = [
   {
     name: 'phone_status',
     description: 'Show the connected PhoneExplorer device, active device and screenshot folder.',
@@ -226,7 +317,18 @@ const tools = [
   },
 ];
 
+const desktopClient = await startAgentDesktop().catch(() => null);
+const tools = [...localTools];
+if (desktopClient) {
+  desktop = desktopClient;
+  tools.push(...desktopClient.tools);
+}
+
 async function callTool(name, args) {
+  if (name.startsWith('desktop_')) {
+    if (!desktop) throw new Error('agent-desktop is not available. Install it and restart PhoneExplorer.');
+    return desktop.call(name, args);
+  }
   switch (name) {
     case 'phone_status':
       return textResult(await bridgeRequest('GET', '/v1/status'));

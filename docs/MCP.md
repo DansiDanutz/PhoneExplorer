@@ -124,3 +124,38 @@ initializes the protocol, lists tools and calls `phone_status`.
   `~/.codex/config.toml`; `codex mcp get phoneexplorer` resolves it.
 - Generic MCP clients: server validated with the official MCP SDK client
   (`tools: 15`).
+
+## agent-desktop integration
+
+The PhoneExplorer MCP server also proxies **agent-desktop** when it is installed.
+That adds 67 `desktop_*` tools to the same MCP connection:
+
+```text
+desktop_status, desktop_snapshot, desktop_find, desktop_click,
+desktop_type, desktop_key, desktop_scroll, desktop_screenshot,
+desktop_launch, desktop_list_windows, desktop_clipboard_get, ...
+```
+
+Install once:
+
+```bash
+npm install -g agent-desktop
+agent-desktop status
+agent-desktop permissions --guide
+```
+
+The server looks for `agent-desktop` in `AGENT_DESKTOP_BIN`,
+`~/.npm-global/bin`, `/opt/homebrew/bin`, and `/usr/local/bin`. If it is not
+available, the phone tools still work and the desktop tools are simply absent.
+
+On this machine the integration was verified with:
+
+```text
+agent-desktop connected (67 tools)
+phoneexplorer tools: 82 (15 phone + 67 desktop)
+desktop_status: accessibility granted, screen recording granted
+```
+
+Desktop automation can read private app content and act on any accessible app.
+Use it only with user permission, prefer headless semantic actions, and review
+the `desktop_*` tool results before continuing.
