@@ -5,8 +5,9 @@ import type { PhoneActions } from '../hooks/usePhone';
 import { clockTime, levelTone, storeName, timeAgo, truncate } from '../lib/format';
 import { Icon } from '../lib/icons';
 import { AppTile, MonogramTile, StoreGlyph } from './AppMark';
+import { Library } from './Library';
 
-export type InspectorTab = 'discover' | 'installed' | 'activity';
+export type InspectorTab = 'discover' | 'installed' | 'activity' | 'library';
 
 interface InspectorProps {
   state: AppState;
@@ -120,6 +121,7 @@ export function Inspector({ state, actions, tab, onTab, onPeek }: InspectorProps
             ['discover', 'Discover'],
             ['installed', 'Installed'],
             ['activity', 'Activity'],
+            ['library', 'Library'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -376,6 +378,10 @@ export function Inspector({ state, actions, tab, onTab, onPeek }: InspectorProps
             </p>
           </div>
         </div>
+      ) : null}
+
+      {tab === 'library' ? (
+        <Library actions={actions} onDiscover={() => onTab('discover')} />
       ) : null}
 
       {tab === 'activity' ? (

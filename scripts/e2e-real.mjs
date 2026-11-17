@@ -130,6 +130,10 @@ try {
   await page.waitForTimeout(200);
   await page.mouse.click(cx, cy, { button: 'middle' });
   await page.waitForTimeout(250);
+  await page.locator('.phone-side--vol-up').click();
+  await page.waitForTimeout(250);
+  await page.locator('.phone-side--power').click();
+  await page.waitForTimeout(250);
   await page.locator('.control-btn[aria-label="Pinch to zoom in"]').click();
   await page.waitForTimeout(350);
   const pinchToast = await page.locator('.toast-copy strong').last().textContent();
@@ -159,6 +163,8 @@ try {
     'shell input swipe 540 1200',
     'shell input swipe 886 1200 194 1200 320',
     'shell input swipe 540 1056 540 1344 220',
+    'shell input keyevent 24',
+    'shell input keyevent 26',
   ];
   for (const needle of required) {
     if (!calls.some((call) => call.includes(needle))) {

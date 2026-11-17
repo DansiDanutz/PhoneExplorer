@@ -5,6 +5,8 @@ import type {
   KeyAction,
   NewPhoneModel,
   PhonePlatform,
+  Screenshot,
+  ScreenshotRequest,
   Settings,
 } from '@shared/types';
 
@@ -34,6 +36,13 @@ export interface PhoneActions {
   pinch: (x: number, y: number, scale: number) => Promise<void>;
   press: (key: KeyAction) => Promise<void>;
   typeText: (text: string) => Promise<void>;
+  captureScreenshot: (request: ScreenshotRequest) => Promise<void>;
+  listScreenshots: () => Promise<Screenshot[]>;
+  getScreenshotsFolder: () => Promise<string>;
+  loadScreenshot: (id: string) => Promise<string>;
+  deleteScreenshot: (id: string) => Promise<void>;
+  revealScreenshot: (id: string) => Promise<void>;
+  revealScreenshotsFolder: () => Promise<void>;
   openStore: (appId?: string) => Promise<void>;
   searchStore: (query: string) => Promise<void>;
   installApp: (appId: string) => Promise<void>;
@@ -197,6 +206,51 @@ export function usePhone(): {
       window.phone.pinch(x, y, scale).catch(fail('Pinch failed')),
     press: (key) => window.phone.press(key).catch(fail('Key press failed')),
     typeText: (text) => window.phone.typeText(text).catch(fail('Typing failed')),
+    captureScreenshot: async (request) => {
+      try {
+        await window.phone.captureScreenshot(request);
+        window.dispatchEvent(new Event('phone:screenshot'));
+      } catch (error) {
+        fail('Screenshot failed')(error);
+      }
+    },
+    listScreenshots: async () => {
+      try {
+        return await window.phone.listScreenshots();
+      } catch (error) {
+        fail('Could not load screenshots')(error);
+        return [];
+      }
+    },
+    getScreenshotsFolder: async () => {
+      try {
+        return await window.phone.getScreenshotsFolder();
+      } catch (error) {
+        fail('Could not find the screenshot folder')(error);
+        return '';
+      }
+    },
+    loadScreenshot: async (id) => {
+      try {
+        return await window.phone.loadScreenshot(id);
+      } catch (error) {
+        fail('Could not open screenshot')(error);
+        return '';
+      }
+    },
+    deleteScreenshot: async (id) => {
+      try {
+        await window.phone.deleteScreenshot(id);
+        window.dispatchEvent(new Event('phone:screenshot'));
+        pushToast('info', 'Screenshot deleted');
+      } catch (error) {
+        fail('Could not delete screenshot')(error);
+      }
+    },
+    revealScreenshot: (id) =>
+      window.phone.revealScreenshot(id).catch(fail('Could not reveal screenshot')),
+    revealScreenshotsFolder: () =>
+      window.phone.revealScreenshotsFolder().catch(fail('Could not open the folder')),
     openStore: (appId) => window.phone.openStore(appId).catch(fail('Could not open the store')),
     searchStore: (query) => window.phone.searchStore(query).catch(fail('Store search failed')),
     installApp: (appId) => window.phone.installApp(appId).catch(fail('Install failed')),

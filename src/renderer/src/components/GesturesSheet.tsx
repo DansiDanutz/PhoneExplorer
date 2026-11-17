@@ -45,6 +45,11 @@ const GESTURES: Array<{ icon: IconName; title: string; body: string }> = [
     body: '←/→ swipe in that direction; ↑/↓ scroll. Ignored while you are typing.',
   },
   {
+    icon: 'camera',
+    title: 'Screenshot',
+    body: 'Camera button on the right margin, or ⌘S. Saved shots live in the Library tab.',
+  },
+  {
     icon: 'keyboard',
     title: 'Type',
     body: 'Open the keyboard button to send text to an Android phone.',

@@ -197,6 +197,7 @@ export function Stage({
             onScroll={(x, y, dx, dy) => void actions.scroll(x, y, dx, dy)}
             onPinch={handlePinch}
             onPress={(key) => void actions.press(key)}
+            onCaptureScreenshot={(request) => void actions.captureScreenshot(request)}
             onStartPreview={() => void actions.startPreview()}
           />
         </div>

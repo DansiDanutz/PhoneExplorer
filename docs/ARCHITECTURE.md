@@ -156,6 +156,22 @@ Fingers are moved in 14 steps, then released in reverse order. Single-touch scro
 short adb swipe; Settings has a **Reverse scroll** toggle for users who prefer the opposite
 wheel direction.
 
+## Screenshot library
+
+The camera button is part of the phone frame, on the right margin below the power button.
+`⌘S` sends the same request. The renderer rasterizes the current `FramePayload` to a PNG at
+its native width and height (402×874 for the demo, the captured frame size for a real
+phone), so the saved image is not limited to the size of the window. If no frame is
+available, it falls back to `webContents.capturePage()` on the `.phone-screen` rect.
+
+The main process writes `PhoneExplorer-YYYY-MM-DD-HH-MM-SS-SSS.png` into
+`~/Pictures/PhoneExplorer` (falling back to `<userData>/screenshots` when macOS or a
+sandbox blocks Pictures). A small `index.json` stores device name, platform, timestamp and
+dimensions; `listScreenshots()` scans the PNGs and merges that metadata, so files copied
+into the folder also appear. The Library tab gets 180 px thumbnails, opens the full PNG in
+a modal, reveals it in Finder, or deletes both the file and its index entry. File IDs are
+validated as a single `.png` basename to prevent path traversal.
+
 ## Install tracking
 
 Real devices cannot be installed onto programmatically through the store, so the flow is a
@@ -232,6 +248,8 @@ phone:store:open       phone:store:search     phone:app:install  phone:app:open
 phone:app:install-file phone:qr:show          phone:qr:hide      phone:external
 phone:wifi             phone:setting          phone:activity:clear
 phone:model:select     phone:model:default    phone:model:add    phone:model:delete
+phone:screenshot:capture phone:screenshot:list phone:screenshot:load
+phone:screenshot:delete phone:screenshot:reveal phone:screenshot:folder
 ```
 
 Events are one channel, `phone:event`, with a discriminated union: `state`, `frame`,
@@ -282,6 +300,7 @@ demo platform, reduce motion. Settings are clamped on load and saved on change.
 | `scripts/e2e.mjs` | full renderer flow on the demo: store, install, open, iPhone, app sheet, QR, focus, settings |
 | `scripts/e2e-models.mjs` | search, switch, add, default, persist and delete demo hardware profiles |
 | `scripts/e2e-gestures.mjs` | guide, right-click Back, wheel scroll, pinch fallback and long-press on the demo |
+| `scripts/e2e-library.mjs` | margin screenshot, 402×874 PNG, Library preview and delete |
 | `scripts/e2e-real.mjs` | real Android pipeline against a fake `adb`: discovery, `screencap` frames, install detection, `monkey` launch, `market://` links, scroll, long-press, Back/Home, pinch fallback |
 | `scrcpy-control.test.ts` | the control session fails closed and rejects gestures when unavailable |
 | `xmllint` (dev) | every generated SVG is valid XML |

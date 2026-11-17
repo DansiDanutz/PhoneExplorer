@@ -140,6 +140,14 @@ export default function App(): React.ReactElement {
         event.preventDefault();
         setTab('activity');
       }
+      if (mod && event.key === '4') {
+        event.preventDefault();
+        setTab('library');
+      }
+      if (mod && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        window.dispatchEvent(new Event('phone:capture-screenshot'));
+      }
       if (event.key === 'Escape' && focusMode && !connectOpen && !settingsOpen && !peekApp && !modelsFor && !guideOpen && !state?.qr) {
         setFocusMode(false);
       }

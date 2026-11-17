@@ -13,6 +13,7 @@ import type {
   KeyAction,
   NewPhoneModel,
   PhonePlatform,
+  ScreenshotRequest,
   ServerEvent,
   Settings,
 } from '../shared/types';
@@ -247,6 +248,13 @@ function registerIpc(instance: DeviceManager): void {
   );
   handle('phone:press', (key: KeyAction) => instance.press(key));
   handle('phone:type', (text: string) => instance.typeText(text));
+  handle('phone:screenshot:capture', (request: ScreenshotRequest) => instance.captureScreenshot(request));
+  handle('phone:screenshot:list', () => instance.listScreenshots());
+  handle('phone:screenshot:folder-path', () => instance.getScreenshotsFolder());
+  handle('phone:screenshot:load', (id: string) => instance.loadScreenshot(id));
+  handle('phone:screenshot:delete', (id: string) => instance.deleteScreenshot(id));
+  handle('phone:screenshot:reveal', (id: string) => instance.revealScreenshot(id));
+  handle('phone:screenshot:folder', () => instance.revealScreenshotsFolder());
   handle('phone:store:open', (appId?: string) => instance.openStore(appId));
   handle('phone:store:search', (query: string) => instance.searchStore(query));
   handle('phone:app:install', (appId: string) => instance.installApp(appId));

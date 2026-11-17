@@ -43,6 +43,7 @@ is always a user action. No phone? A complete interactive demo phone runs locall
 | Device discovery | `adb devices`, USB + Wi-Fi | `libimobiledevice` or `idb` |
 | Screen preview | `adb exec-out screencap` at 1–10 fps | `idb screenshot` or `idevicescreenshot` |
 | Touch control | tap, drag, wheel/arrow scroll, long-press, pinch, Back/Home keys | tap, drag, wheel/arrow scroll, Back/Home edge swipes |
+| Screenshots | camera button on the phone margin / ⌘S, Library tab | same |
 | Multi-touch | scrcpy control channel (auto, Android 5+) | single touch via idb |
 | Store deep link | `market://details`, `market://search` | `itms-apps://` via `idb open-url` |
 | Install detection | watches `pm list packages` | watches `idb list-apps` |
@@ -151,6 +152,9 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
   swipes, **hold** long-presses, **right-click** is Back and **middle-click** is Home.
   Mouse Back/Forward buttons also send Back/Home. If scrolling feels backwards, turn on
   **Reverse scroll** in Settings.
+- **Screenshot** with the camera button on the phone’s right margin, or **⌘S**. Every capture
+  lands in **Library** (⌘4), where you can preview, reveal and delete it. The Library header
+  shows the exact folder; normally `~/Pictures/PhoneExplorer`.
 - **Ctrl/⌘ + wheel** or the zoom buttons send a two-finger **pinch** on Android through the
   scrcpy control channel. On Android, tap, drag, scroll, long-press, Back and Home always
   use adb, so basic control does not depend on scrcpy starting.
@@ -159,6 +163,8 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **Focus mode** hides both rails; **Esc** returns.
 
 ![Gesture guide explaining tap, drag, scroll, pinch and hold](docs/screenshots/gestures.png)
+
+![Screenshot Library with a captured demo screen](docs/screenshots/library.png)
 
 Other screens: [app detail](docs/screenshots/app-detail.png) ·
 [installed apps](docs/screenshots/installed.png) ·
@@ -217,6 +223,7 @@ npm test            # unit + scene rendering tests
 npm run e2e          # Playwright: demo install → open → iPhone → settings
 npm run e2e:models   # model search, custom profile, defaults, delete
 npm run e2e:gestures # guide, right-click Back, scroll/pinch fallbacks
+npm run e2e:library  # screenshot button, Library preview, delete, native-resolution PNG
 npm run e2e:real     # Playwright + a fake adb: discovery, mirror, install, gestures, launch
 npm run showcase     # regenerate docs/showcase screenshots
 npm run icon        # rebuild build/icon.png + icon.icns
@@ -234,6 +241,8 @@ npm run dist        # electron-builder: dmg + zip (macOS)
   platform defaults, verifies persistence and deletes the custom profile.
 - **Gesture E2E** checks the guide, right-click Back, wheel-scroll, pinch fallback and
   long-press on the demo.
+- **Library E2E** captures a phone-margin screenshot, checks the native 402×874 PNG, opens
+  it in the Library viewer and deletes it from disk and the panel.
 - **Real-path E2E** points the app at `scripts/fake-adb.mjs`, a tiny adb stand-in that
   implements device discovery, screenshots, package lists, input and store deep links.
   It proves the Android pipeline without hardware: frame capture, install detection via
@@ -257,11 +266,12 @@ src/
       demo.ts                interactive simulated phones (SVG scene engine)
   preload/index.ts           contextBridge API
   renderer/                  React UI (no UI framework, hand-built design system)
+    components/Library.tsx   screenshot gallery, preview, reveal and delete
   shared/                    types, app catalog, phone models, store links, marks
 vendor/
   scrcpy-server              unmodified scrcpy 3.3.3 control server (Apache-2.0)
 scripts/
-  e2e.mjs · e2e-real.mjs · e2e-models.mjs · e2e-gestures.mjs
+  e2e.mjs · e2e-real.mjs · e2e-models.mjs · e2e-gestures.mjs · e2e-library.mjs
   fake-adb.mjs · showcase.mjs · contact-sheet.mjs · make-icon.mjs · fixture-screen.mjs
 docs/                        architecture, research, screenshots
 ```

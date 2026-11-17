@@ -211,6 +211,30 @@ export type KeyAction =
   | 'volume_up'
   | 'volume_down';
 
+export interface ScreenshotRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ScreenshotRequest {
+  rect?: ScreenshotRect;
+  dataUrl?: string;
+}
+
+export interface Screenshot {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: number;
+  width: number;
+  height: number;
+  deviceName: string;
+  platform: PhonePlatform | null;
+  thumbnail: string;
+}
+
 export interface FramePayload {
   deviceId: string;
   mime: string;
@@ -257,6 +281,13 @@ export interface PhoneAPI {
   scroll(x: number, y: number, deltaX: number, deltaY: number): Promise<void>;
   pinch(x: number, y: number, scale: number): Promise<void>;
   press(key: KeyAction): Promise<void>;
+  captureScreenshot(request: ScreenshotRequest): Promise<Screenshot>;
+  listScreenshots(): Promise<Screenshot[]>;
+  getScreenshotsFolder(): Promise<string>;
+  loadScreenshot(id: string): Promise<string>;
+  deleteScreenshot(id: string): Promise<void>;
+  revealScreenshot(id: string): Promise<void>;
+  revealScreenshotsFolder(): Promise<void>;
   typeText(text: string): Promise<void>;
   openStore(appId?: string): Promise<void>;
   searchStore(query: string): Promise<void>;

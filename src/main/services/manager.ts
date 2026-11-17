@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { app, dialog, nativeImage, shell, type BrowserWindow } from 'electron';
 import QRCode from 'qrcode';
 import {
@@ -22,6 +22,8 @@ import type {
   PhonePlatform,
   QrPayload,
   ServerEvent,
+  Screenshot,
+  ScreenshotRequest,
   Settings,
   ToolStatus,
 } from '../../shared/types';
@@ -60,6 +62,20 @@ const KEYCODES: Record<KeyAction, number> = {
   volume_up: 24,
   volume_down: 25,
 };
+
+interface StoredScreenshot {
+  id: string;
+  createdAt: number;
+  width: number;
+  height: number;
+  deviceName: string;
+  platform: PhonePlatform | null;
+}
+
+interface ScreenshotIndex {
+  version: 1;
+  items: StoredScreenshot[];
+}
 
 export interface ManagerOptions {
   dataDir: string;
@@ -107,6 +123,7 @@ export class DeviceManager {
   private androidControl: ScrcpyControl | null = null;
   private controlAttemptSerial: string | null = null;
   private demoGestureNotices = new Map<string, number>();
+  private screenshotRoot: string | null = null;
   private scrollBusy = false;
   private pendingScroll: { nx: number; ny: number; deltaX: number; deltaY: number } | null = null;
 
@@ -1080,6 +1097,207 @@ export class DeviceManager {
           `${messageOf(error)} · basic adb touch remains active`,
         );
       });
+  }
+
+  // -------------------------------------------------------------------------
+  // Screenshot library
+  // -------------------------------------------------------------------------
+
+  private async ensureScreenshotDir(): Promise<string> {
+    if (this.screenshotRoot) return this.screenshotRoot;
+    const preferred =
+      process.env.PHONEEXPLORER_SCREENSHOT_DIR ||
+      join(app.getPath('pictures'), 'PhoneExplorer');
+    try {
+      await fs.mkdir(preferred, { recursive: true });
+      this.screenshotRoot = preferred;
+      return preferred;
+    } catch {
+      // Sandboxes and unusual home directories may not allow Pictures.
+      // Keep the library working inside the app's data directory instead.
+      const fallback = join(this.options.dataDir, 'screenshots');
+      await fs.mkdir(fallback, { recursive: true });
+      this.screenshotRoot = fallback;
+      return fallback;
+    }
+  }
+
+  async getScreenshotsFolder(): Promise<string> {
+    return this.ensureScreenshotDir();
+  }
+
+  private async readScreenshotIndex(dir: string): Promise<ScreenshotIndex> {
+    try {
+      const raw = await fs.readFile(join(dir, 'index.json'), 'utf8');
+      const parsed = JSON.parse(raw) as Partial<ScreenshotIndex>;
+      const items = Array.isArray(parsed.items)
+        ? parsed.items.filter(
+            (item): item is StoredScreenshot =>
+              Boolean(item) &&
+              typeof item.id === 'string' &&
+              typeof item.createdAt === 'number' &&
+              typeof item.width === 'number' &&
+              typeof item.height === 'number' &&
+              typeof item.deviceName === 'string' &&
+              (item.platform === 'android' || item.platform === 'ios' || item.platform === null),
+          )
+        : [];
+      return { version: 1, items };
+    } catch {
+      return { version: 1, items: [] };
+    }
+  }
+
+  private async writeScreenshotIndex(dir: string, items: StoredScreenshot[]): Promise<void> {
+    const target = join(dir, 'index.json');
+    const temporary = `${target}.tmp`;
+    await fs.writeFile(
+      temporary,
+      JSON.stringify({ version: 1, items: items.slice(0, 300) } satisfies ScreenshotIndex, null, 2),
+      'utf8',
+    );
+    try {
+      await fs.rename(temporary, target);
+    } catch {
+      await fs.rm(target, { force: true });
+      await fs.rename(temporary, target);
+    }
+  }
+
+  private screenshotFromPath(path: string, meta: StoredScreenshot): Screenshot | null {
+    const image = nativeImage.createFromPath(path);
+    if (image.isEmpty()) return null;
+    const size = image.getSize();
+    const thumbnail = image.resize({ width: 180, quality: 'good' }).toDataURL();
+    return {
+      id: meta.id,
+      name: basename(path),
+      path,
+      createdAt: meta.createdAt,
+      width: size.width || meta.width,
+      height: size.height || meta.height,
+      deviceName: meta.deviceName,
+      platform: meta.platform,
+      thumbnail,
+    };
+  }
+
+  async listScreenshots(): Promise<Screenshot[]> {
+    const dir = await this.ensureScreenshotDir();
+    const entries = await fs.readdir(dir).catch(() => []);
+    const index = await this.readScreenshotIndex(dir);
+    const byId = new Map(index.items.map((item) => [item.id, item]));
+    const shots: Screenshot[] = [];
+    for (const file of entries.filter((name) => /\.png$/i.test(name)).slice(0, 120)) {
+      if (!/^[A-Za-z0-9._-]+\.png$/i.test(file)) continue;
+      const path = join(dir, file);
+      const stat = await fs.stat(path).catch(() => null);
+      if (!stat || !stat.isFile()) continue;
+      const meta = byId.get(file) ?? {
+        id: file,
+        createdAt: stat.mtimeMs,
+        width: 0,
+        height: 0,
+        deviceName: 'Phone screen',
+        platform: null,
+      };
+      const shot = this.screenshotFromPath(path, meta);
+      if (shot) shots.push(shot);
+    }
+    shots.sort((a, b) => b.createdAt - a.createdAt);
+    return shots.slice(0, 80);
+  }
+
+  async captureScreenshot(request: ScreenshotRequest): Promise<Screenshot> {
+    let image: ReturnType<typeof nativeImage.createFromBuffer> | null = null;
+    if (request.dataUrl) {
+      const match = /^data:image\/(?:png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(request.dataUrl);
+      if (!match) throw new Error('The screenshot data is not a PNG or JPEG.');
+      image = nativeImage.createFromBuffer(Buffer.from(match[1], 'base64'));
+    } else if (request.rect) {
+      const window = this.options.getWindow();
+      if (!window || window.isDestroyed()) throw new Error('The app window is not available.');
+      const [contentWidth, contentHeight] = window.getContentSize();
+      const x = Math.max(0, Math.min(contentWidth - 1, Math.round(request.rect.x)));
+      const y = Math.max(0, Math.min(contentHeight - 1, Math.round(request.rect.y)));
+      const width = Math.max(1, Math.min(contentWidth - x, Math.round(request.rect.width)));
+      const height = Math.max(1, Math.min(contentHeight - y, Math.round(request.rect.height)));
+      if (width < 2 || height < 2) throw new Error('The phone screen is not visible.');
+      image = await window.webContents.capturePage({ x, y, width, height });
+    }
+    if (!image || image.isEmpty()) {
+      throw new Error('The screenshot came back empty.');
+    }
+
+    const dir = await this.ensureScreenshotDir();
+    const now = new Date();
+    const stamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+      String(now.getHours()).padStart(2, '0'),
+      String(now.getMinutes()).padStart(2, '0'),
+      String(now.getSeconds()).padStart(2, '0'),
+      String(now.getMilliseconds()).padStart(3, '0'),
+    ].join('-');
+    let id = `PhoneExplorer-${stamp}.png`;
+    let suffix = 1;
+    while (await fs.stat(join(dir, id)).then(() => true).catch(() => false)) {
+      id = `PhoneExplorer-${stamp}-${suffix}.png`;
+      suffix += 1;
+    }
+    const path = join(dir, id);
+    await fs.writeFile(path, image.toPNG());
+    const device = this.activeDevice;
+    const meta: StoredScreenshot = {
+      id,
+      createdAt: now.getTime(),
+      width: image.getSize().width,
+      height: image.getSize().height,
+      deviceName: device?.name ?? 'Phone screen',
+      platform: device?.platform ?? null,
+    };
+    const index = await this.readScreenshotIndex(dir);
+    await this.writeScreenshotIndex(dir, [
+      meta,
+      ...index.items.filter((item) => item.id !== id),
+    ]);
+    this.log('success', 'Screenshot saved', path);
+    this.toast('success', 'Screenshot saved', path);
+    const shot = this.screenshotFromPath(path, meta);
+    if (!shot) throw new Error('The screenshot could not be read back.');
+    return shot;
+  }
+
+  private async screenshotPath(id: string): Promise<string> {
+    if (id !== basename(id) || !/^[A-Za-z0-9._-]+\.png$/i.test(id)) {
+      throw new Error('Invalid screenshot name.');
+    }
+    const dir = await this.ensureScreenshotDir();
+    return join(dir, id);
+  }
+
+  async loadScreenshot(id: string): Promise<string> {
+    const data = await fs.readFile(await this.screenshotPath(id));
+    return `data:image/png;base64,${data.toString('base64')}`;
+  }
+
+  async deleteScreenshot(id: string): Promise<void> {
+    const path = await this.screenshotPath(id);
+    await fs.unlink(path);
+    const dir = await this.ensureScreenshotDir();
+    const index = await this.readScreenshotIndex(dir);
+    await this.writeScreenshotIndex(dir, index.items.filter((item) => item.id !== id));
+    this.log('info', 'Screenshot deleted', path);
+  }
+
+  async revealScreenshot(id: string): Promise<void> {
+    shell.showItemInFolder(await this.screenshotPath(id));
+  }
+
+  async revealScreenshotsFolder(): Promise<void> {
+    const dir = await this.ensureScreenshotDir();
+    await shell.openPath(dir);
   }
 
   // -------------------------------------------------------------------------

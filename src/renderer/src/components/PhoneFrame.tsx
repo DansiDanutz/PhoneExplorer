@@ -6,7 +6,7 @@ import {
   type PointerEvent,
   type ReactElement,
 } from 'react';
-import type { DeviceInfo, FramePayload, KeyAction } from '@shared/types';
+import type { DeviceInfo, FramePayload, KeyAction, ScreenshotRequest } from '@shared/types';
 import { shade } from '../lib/format';
 import { Icon } from '../lib/icons';
 
@@ -20,6 +20,7 @@ interface PhoneFrameProps {
   onScroll: (x: number, y: number, deltaX: number, deltaY: number) => void;
   onPinch: (x: number, y: number, scale: number) => void;
   onPress: (key: KeyAction) => void;
+  onCaptureScreenshot: (request: ScreenshotRequest) => void;
   onStartPreview: () => void;
 }
 
@@ -81,6 +82,7 @@ export function PhoneFrame({
   onScroll,
   onPinch,
   onPress,
+  onCaptureScreenshot,
   onStartPreview,
 }: PhoneFrameProps): ReactElement {
   const screenRef = useRef<HTMLDivElement>(null);
@@ -91,6 +93,7 @@ export function PhoneFrame({
   const longFired = useRef(false);
   const lastInputAt = useRef(0);
   const movedDuringPress = useRef(false);
+  const captureRef = useRef<() => Promise<void>>(async () => undefined);
   const scrollAccum = useRef({
     x: 0,
     y: 0,
@@ -272,6 +275,49 @@ export function PhoneFrame({
     onTap((h.x + h.w / 2) / (frame?.width ?? 402), (h.y + h.h / 2) / (frame?.height ?? 874));
   };
 
+  const capture = async (): Promise<void> => {
+    const current = frameRef.current;
+    if (current && current.width > 0 && current.height > 0) {
+      try {
+        const image = new Image();
+        image.src = frameUrl(current);
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = current.width;
+        canvas.height = current.height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas is unavailable.');
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(image, 0, 0, current.width, current.height);
+        onCaptureScreenshot({ dataUrl: canvas.toDataURL('image/png') });
+        return;
+      } catch {
+        // Fall back to the visible window rect if the frame cannot be
+        // rasterized (for example a malformed remote image).
+      }
+    }
+    const rect = screenRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    onCaptureScreenshot({
+      rect: {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      },
+    });
+  };
+
+  captureRef.current = capture;
+
+  useEffect(() => {
+    const onRequest = (): void => {
+      void captureRef.current();
+    };
+    window.addEventListener('phone:capture-screenshot', onRequest);
+    return () => window.removeEventListener('phone:capture-screenshot', onRequest);
+  }, []);
+
   const statusMessage = !previewActive
     ? 'Preview is paused'
     : 'Waiting for the first frame';
@@ -297,9 +343,36 @@ export function PhoneFrame({
         style={shellStyle}
       >
         <span className="phone-side phone-side--mute" aria-hidden="true" />
-        <span className="phone-side phone-side--vol-up" aria-hidden="true" />
-        <span className="phone-side phone-side--vol-down" aria-hidden="true" />
-        <span className="phone-side phone-side--power" aria-hidden="true" />
+        <button
+          type="button"
+          className="phone-side phone-side--vol-up"
+          onClick={() => onPress('volume_up')}
+          title="Volume up"
+          aria-label="Volume up"
+        />
+        <button
+          type="button"
+          className="phone-side phone-side--vol-down"
+          onClick={() => onPress('volume_down')}
+          title="Volume down"
+          aria-label="Volume down"
+        />
+        <button
+          type="button"
+          className="phone-side phone-side--power"
+          onClick={() => onPress('power')}
+          title="Power"
+          aria-label="Power"
+        />
+        <button
+          type="button"
+          className="phone-side phone-side--shot"
+          onClick={() => void capture()}
+          title="Save a screenshot"
+          aria-label="Save a screenshot"
+        >
+          <Icon name="camera" size={14} />
+        </button>
         <div className="phone-bezel">
           <div
             className="phone-screen"

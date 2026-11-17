@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactElement, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { AppState, CatalogApp, PhonePlatform, QrPayload } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
 import { storeName } from '../lib/format';
@@ -21,7 +22,7 @@ export function Overlay({ children, onClose, className, label }: OverlayProps): 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       className="overlay"
       onMouseDown={(event) => {
@@ -36,7 +37,8 @@ export function Overlay({ children, onClose, className, label }: OverlayProps): 
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
