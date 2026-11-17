@@ -110,6 +110,10 @@ try {
   const cy = phone.y + phone.height / 2;
   await page.mouse.click(cx, cy);
   await page.waitForTimeout(350);
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(350);
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(350);
   await page.mouse.move(cx, cy);
   await page.mouse.down();
   await page.mouse.move(cx + 60, cy - 80, { steps: 8 });
@@ -153,6 +157,8 @@ try {
     'shell am start -a android.intent.action.VIEW -d market://search?q=Notion',
     'shell input tap 540 1200',
     'shell input swipe 540 1200',
+    'shell input swipe 886 1200 194 1200 320',
+    'shell input swipe 540 1056 540 1344 220',
   ];
   for (const needle of required) {
     if (!calls.some((call) => call.includes(needle))) {
@@ -167,7 +173,7 @@ try {
   if (!drag || /input swipe 540 1200 540 1200 /.test(drag)) {
     throw new Error(`drag did not reach adb\n${calls.join('\n')}`);
   }
-  if (!calls.some((call) => call.includes('shell input swipe') && call.endsWith(' 180'))) {
+  if (!calls.some((call) => call.includes('shell input swipe') && call.endsWith(' 220'))) {
     throw new Error(`scroll did not reach adb\n${calls.join('\n')}`);
   }
   if (!calls.some((call) => call.includes('shell input swipe') && call.endsWith(' 700'))) {

@@ -179,6 +179,7 @@ export interface Settings {
   adbPath: string;
   demoPlatform: PhonePlatform;
   reduceMotion: boolean;
+  invertScroll: boolean;
   customModels: PhoneModel[];
   defaultAndroidModelId: string;
   defaultIosModelId: string;

@@ -22,7 +22,7 @@ const GESTURES: Array<{ icon: IconName; title: string; body: string }> = [
   {
     icon: 'chevron-down',
     title: 'Wheel',
-    body: 'Scroll the mouse wheel to scroll the phone in the same direction.',
+    body: 'Scroll the wheel, or press ↑/↓, to scroll the phone in the same direction.',
   },
   {
     icon: 'zoom-in',
@@ -32,12 +32,17 @@ const GESTURES: Array<{ icon: IconName; title: string; body: string }> = [
   {
     icon: 'clock',
     title: 'Hold',
-    body: 'Press and hold for 620 ms to long-press, context menu or drag-and-drop.',
+    body: 'Press and hold for 620 ms to long-press or open a context menu.',
   },
   {
     icon: 'chevron-left',
     title: 'Right click',
-    body: 'Right-click sends Back. Middle-click sends Home.',
+    body: 'Right-click or the mouse Back button sends Back. Middle-click or Forward sends Home.',
+  },
+  {
+    icon: 'arrow-right',
+    title: 'Arrow keys',
+    body: '←/→ swipe in that direction; ↑/↓ scroll. Ignored while you are typing.',
   },
   {
     icon: 'keyboard',
@@ -62,7 +67,7 @@ export function GesturesSheet({ state, onClose }: GesturesSheetProps): ReactElem
           <h2>Control the phone</h2>
           <p>
             The mirror is an input surface. Click, drag, scroll and pinch are sent to the
-            phone, not just drawn on screen.
+            phone, or simulated in the demo.
           </p>
         </div>
         <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
@@ -89,14 +94,14 @@ export function GesturesSheet({ state, onClose }: GesturesSheetProps): ReactElem
             {multiTouch
               ? 'Multi-touch is ready on this phone'
               : device?.isDemo
-                ? 'Demo screens are static for scroll and pinch'
+                ? 'Demo gestures are simulated'
                 : 'Single touch is active'}
           </strong>
           <span>
             {multiTouch
               ? 'scrcpy control channel · two-finger pinch enabled. Tap, drag, scroll and long-press use adb.'
               : device?.isDemo
-                ? 'Use a real Android phone for scroll and pinch; tap, drag and Back work here.'
+                ? 'Demo pinch zooms the mirror; wheel and arrows change pages or scroll the store.'
                 : device?.platform === 'ios'
                   ? 'The iPhone bridge injects single touch. Pinch needs a WebDriverAgent session.'
                   : 'Android pinch starts automatically through scrcpy. Tap, drag, scroll and long-press use adb.'}

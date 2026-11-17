@@ -134,8 +134,8 @@ The renderer is an input surface, not just a video view:
 | Gesture | Renderer event | Android | iPhone |
 | --- | --- | --- | --- |
 | Tap | pointer down/up | `adb input tap` | `idb ui tap` |
-| Drag / swipe | pointer drag | `adb input swipe` | `idb ui swipe` |
-| Scroll | wheel | directional `adb input swipe` | directional swipe |
+| Drag / swipe | pointer drag, ←/→ | `adb input swipe` | `idb ui swipe` |
+| Scroll | wheel, ↑/↓ | directional `adb input swipe` | directional swipe |
 | Long press | 620 ms hold | same-point `adb input swipe` | same-point swipe |
 | Pinch | Ctrl/⌘+wheel or buttons | scrcpy two-pointer gesture | not available (single touch) |
 | Back | right-click | `adb keyevent 4` | left-edge system gesture |
@@ -152,8 +152,9 @@ break normal clicking. The control engine is shown in the stage footer and conne
 The pinch sequence uses two pointer IDs. The first `ACTION_DOWN` creates the primary
 pointer; the second is sent as `ACTION_DOWN` too because scrcpy converts it to
 `ACTION_POINTER_DOWN | (index << SHIFT)` and the matching `ACTION_UP` to `ACTION_POINTER_UP`.
-Fingers are moved in 14 steps, then released in reverse order. Scroll is inverted from the
-browser's `deltaY` to Android's `AXIS_VSCROLL` convention.
+Fingers are moved in 14 steps, then released in reverse order. Single-touch scroll is a
+short adb swipe; Settings has a **Reverse scroll** toggle for users who prefer the opposite
+wheel direction.
 
 ## Install tracking
 

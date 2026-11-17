@@ -3951,3 +3951,31 @@
 .control-state.is-native {
   color: var(--accent);
 }
+
+/* Demo viewer pinch zoom */
+
+.stage-phone-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.16s var(--ease);
+  transform-origin: center center;
+}
+
+.stage-canvas.is-zoomed {
+  overflow: hidden;
+}
+
+button.control-state {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+button.control-state.is-zoom {
+  color: var(--accent);
+  cursor: pointer;
+}

@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import type { AppState, FramePayload } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
 import { storeName } from '../lib/format';
@@ -26,8 +26,22 @@ export function Stage({
 }: StageProps): ReactElement {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [text, setText] = useState('');
+  const [viewerZoom, setViewerZoom] = useState(1);
   const device = state.devices.find((candidate) => candidate.id === state.activeDeviceId) ?? null;
   const liveFrame = frame && frame.deviceId === device?.id ? frame : null;
+  const demoZoom = Boolean(device?.isDemo) && viewerZoom > 1.01;
+
+  useEffect(() => {
+    setViewerZoom(1);
+  }, [device?.id, device?.modelId]);
+
+  const handlePinch = (x: number, y: number, scale: number): void => {
+    if (device?.isDemo) {
+      setViewerZoom((current) => Math.max(1, Math.min(2.2, current * scale)));
+      return;
+    }
+    void actions.pinch(x, y, scale);
+  };
   const multiTouch = device?.controlEngine === 'scrcpy';
   const controlLabel = !device?.capabilities.input
     ? 'VIEW ONLY'
@@ -41,10 +55,10 @@ export function Stage({
   const gestureHint = !device?.capabilities.input
     ? 'VIEW ONLY'
     : multiTouch
-      ? 'TAP · DRAG · SCROLL · PINCH'
+      ? 'TAP · DRAG · WHEEL/ARROWS · PINCH'
       : device.isDemo
-        ? 'TAP · SWIPE'
-        : 'TAP · DRAG · SCROLL';
+        ? 'TAP · SWIPE · WHEEL/ARROWS'
+        : 'TAP · DRAG · WHEEL/ARROWS';
 
   if (!device) {
     return (
@@ -165,22 +179,27 @@ export function Stage({
         </div>
       </div>
 
-      <div className="stage-canvas">
+      <div className={`stage-canvas ${demoZoom ? 'is-zoomed' : ''}`}>
         <div className="stage-grid" aria-hidden="true" />
         <div className="stage-glow" data-platform={device.platform} aria-hidden="true" />
         <div className="stage-floor" aria-hidden="true" />
-        <PhoneFrame
-          device={device}
-          frame={liveFrame}
-          previewActive={state.preview.active}
-          onTap={(x, y) => void actions.tap(x, y)}
-          onLongPress={(x, y) => void actions.longPress(x, y)}
-          onSwipe={(x1, y1, x2, y2) => void actions.swipe(x1, y1, x2, y2)}
-          onScroll={(x, y, dx, dy) => void actions.scroll(x, y, dx, dy)}
-          onPinch={(x, y, scale) => void actions.pinch(x, y, scale)}
-          onPress={(key) => void actions.press(key)}
-          onStartPreview={() => void actions.startPreview()}
-        />
+        <div
+          className="stage-phone-zoom"
+          style={{ transform: `scale(${viewerZoom})` }}
+        >
+          <PhoneFrame
+            device={device}
+            frame={liveFrame}
+            previewActive={state.preview.active}
+            onTap={(x, y) => void actions.tap(x, y)}
+            onLongPress={(x, y) => void actions.longPress(x, y)}
+            onSwipe={(x1, y1, x2, y2) => void actions.swipe(x1, y1, x2, y2)}
+            onScroll={(x, y, dx, dy) => void actions.scroll(x, y, dx, dy)}
+            onPinch={handlePinch}
+            onPress={(key) => void actions.press(key)}
+            onStartPreview={() => void actions.startPreview()}
+          />
+        </div>
       </div>
 
       <div className="control-wrap">
@@ -249,7 +268,7 @@ export function Stage({
             <button
               type="button"
               className="control-btn"
-              onClick={() => void actions.pinch(0.5, 0.5, 0.74)}
+              onClick={() => handlePinch(0.5, 0.5, 0.74)}
               title="Pinch to zoom out"
               aria-label="Pinch to zoom out"
             >
@@ -258,7 +277,7 @@ export function Stage({
             <button
               type="button"
               className="control-btn"
-              onClick={() => void actions.pinch(0.5, 0.5, 1.35)}
+              onClick={() => handlePinch(0.5, 0.5, 1.35)}
               title="Pinch to zoom in"
               aria-label="Pinch to zoom in"
             >
@@ -356,9 +375,14 @@ export function Stage({
         <div className="foot-right">
           <span className="mono-label">{gestureHint}</span>
           <span className="foot-sep" />
-          <span className={`mono-label control-state ${multiTouch ? 'is-native' : ''}`}>
-            {controlLabel}
-          </span>
+          <button
+            type="button"
+            className={`mono-label control-state ${multiTouch ? 'is-native' : ''} ${demoZoom ? 'is-zoom' : ''}`}
+            onClick={() => setViewerZoom(1)}
+            title={demoZoom ? 'Reset demo zoom' : undefined}
+          >
+            {demoZoom ? `DEMO ZOOM ${viewerZoom.toFixed(1)}×` : controlLabel}
+          </button>
           <span className="foot-sep" />
           <span className="mono-label">{state.settings.fps} FPS TARGET</span>
         </div>

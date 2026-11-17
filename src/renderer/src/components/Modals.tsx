@@ -383,6 +383,17 @@ export function SettingsSheet({
               label="Reduce motion"
             />
           </div>
+          <div className="setting-row">
+            <div className="setting-copy">
+              <span>Reverse scroll</span>
+              <small>Flip wheel and ↑/↓ scrolling if it feels backwards.</small>
+            </div>
+            <Toggle
+              checked={state.settings.invertScroll}
+              onChange={(next) => void actions.updateSetting('invertScroll', next)}
+              label="Reverse scroll"
+            />
+          </div>
         </section>
 
         <section className="settings-group">

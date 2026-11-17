@@ -45,6 +45,7 @@ const DEFAULT_SETTINGS: Settings = {
   adbPath: '',
   demoPlatform: 'android',
   reduceMotion: false,
+  invertScroll: false,
   customModels: [],
   defaultAndroidModelId: DEFAULT_ANDROID_MODEL_ID,
   defaultIosModelId: DEFAULT_IOS_MODEL_ID,
@@ -106,6 +107,8 @@ export class DeviceManager {
   private androidControl: ScrcpyControl | null = null;
   private controlAttemptSerial: string | null = null;
   private demoGestureNotices = new Map<string, number>();
+  private scrollBusy = false;
+  private pendingScroll: { nx: number; ny: number; deltaX: number; deltaY: number } | null = null;
 
   constructor(private readonly options: ManagerOptions) {
     this.adb = new AdbClient(() => this.settings.adbPath);
@@ -246,6 +249,7 @@ export class DeviceManager {
         fps: clamp(Number(parsed.fps ?? DEFAULT_SETTINGS.fps), 1, 10),
         quality: clamp(Number(parsed.quality ?? DEFAULT_SETTINGS.quality), 40, 95),
         demoPlatform: parsed.demoPlatform === 'ios' ? 'ios' : 'android',
+        invertScroll: Boolean(parsed.invertScroll),
         customModels,
         defaultAndroidModelId:
           typeof parsed.defaultAndroidModelId === 'string'
@@ -603,11 +607,13 @@ export class DeviceManager {
         null;
       if (next) {
         this.activeId = next.id;
+        this.pendingScroll = null;
         this.installed = [];
         void this.refreshInstalled();
         if (this.previewActive) void this.startPreview(true);
       } else {
         this.activeId = null;
+        this.pendingScroll = null;
       }
     }
 
@@ -672,6 +678,7 @@ export class DeviceManager {
     }
     if (this.previewActive) await this.stopPreview();
     await this.stopControlSession();
+    this.pendingScroll = null;
     this.activeId = device.id;
     this.installed = [];
     this.installedSignature = '';
@@ -1187,20 +1194,51 @@ export class DeviceManager {
   }
 
   async scroll(nx: number, ny: number, deltaX: number, deltaY: number): Promise<void> {
+    if (this.scrollBusy) {
+      // Trackpads can emit dozens of events per gesture. Keep only the latest
+      // delta instead of queueing an adb swipe for every event.
+      this.pendingScroll = { nx, ny, deltaX, deltaY };
+      return;
+    }
+    this.scrollBusy = true;
+    try {
+      await this.scrollNow(nx, ny, deltaX, deltaY);
+    } finally {
+      this.scrollBusy = false;
+      const pending = this.pendingScroll;
+      this.pendingScroll = null;
+      if (pending) void this.scroll(pending.nx, pending.ny, pending.deltaX, pending.deltaY);
+    }
+  }
+
+  private async scrollNow(
+    nx: number,
+    ny: number,
+    deltaX: number,
+    deltaY: number,
+  ): Promise<void> {
     const device = this.activeDevice;
     if (!device || !device.capabilities.input) return;
+    if (this.settings.invertScroll) {
+      deltaX = -deltaX;
+      deltaY = -deltaY;
+    }
     if (device.isDemo) {
-      this.demoGestureNotice(
-        'scroll',
-        'Demo screens are static',
-        'Scroll and pinch run on the real phone; the demo has no scrollable surface.',
-      );
+      const demo = this.activeDemo;
+      if (demo?.scroll(deltaX, deltaY)) this.sendDemoFrame(true);
+      else {
+        this.demoGestureNotice(
+          'scroll',
+          'Nothing to scroll here',
+          'This demo screen has no vertical content.',
+        );
+      }
       return;
     }
     const size = this.inputSize(device);
     const point = this.toDevicePoint(nx, ny);
     try {
-      const distance = clamp(Math.max(Math.abs(deltaX), Math.abs(deltaY)) * 0.8, 50, 420);
+      const distance = clamp(Math.max(Math.abs(deltaX), Math.abs(deltaY)) * 1.2, 100, 460);
       let x1 = point.x;
       let y1 = point.y;
       let x2 = point.x;
@@ -1215,9 +1253,9 @@ export class DeviceManager {
         x2 = clamp(point.x - (direction * distance) / 2, 1, size.width - 2);
       }
       if (device.platform === 'android') {
-        await this.adb.swipe(device.serial, x1, y1, x2, y2, 180);
+        await this.adb.swipe(device.serial, x1, y1, x2, y2, 220);
       } else {
-        await this.ios.swipe(device.serial, x1, y1, x2, y2, 180);
+        await this.ios.swipe(device.serial, x1, y1, x2, y2, 220);
       }
     } catch (error) {
       this.log('error', 'Scroll failed', messageOf(error));
@@ -1281,7 +1319,9 @@ export class DeviceManager {
     const end = this.toDevicePoint(x2, y2);
     try {
       if (device.isDemo) {
-        this.log('info', 'Swipe simulated', 'Demo content has no scroll physics yet.');
+        const demo = this.activeDemo;
+        if (demo?.swipe(start.x, start.y, end.x, end.y)) this.sendDemoFrame(true);
+        else this.demoGestureNotice('swipe', 'Nothing to swipe here', 'Try Home or Back.');
       } else if (device.platform === 'android') {
         await this.adb.swipe(device.serial, start.x, start.y, end.x, end.y, durationMs);
       } else {

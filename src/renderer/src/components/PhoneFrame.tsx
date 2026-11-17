@@ -140,13 +140,15 @@ export function PhoneFrame({
         accum.x = p.nx;
         accum.y = p.ny;
         accum.scale *= Math.exp(-event.deltaY * 0.0025);
+        // A pinch is one discrete two-pointer gesture; send it after the
+        // trackpad stream settles rather than interleaving gestures.
         if (accum.timer) window.clearTimeout(accum.timer);
         accum.timer = window.setTimeout(() => {
           const scale = Math.max(0.5, Math.min(2, accum.scale));
           accum.scale = 1;
           accum.timer = null;
           callbacksRef.current.onPinch(accum.x, accum.y, scale);
-        }, 80);
+        }, 90);
         return;
       }
       const accum = scrollAccum.current;
@@ -154,16 +156,17 @@ export function PhoneFrame({
       accum.y = p.ny;
       accum.deltaX += event.deltaX;
       accum.deltaY += event.deltaY;
-      if (accum.timer) window.clearTimeout(accum.timer);
-      accum.timer = window.setTimeout(() => {
-        const { x, y, deltaX, deltaY } = accum;
-        accum.deltaX = 0;
-        accum.deltaY = 0;
-        accum.timer = null;
-        if (Math.abs(deltaX) + Math.abs(deltaY) > 0) {
-          callbacksRef.current.onScroll(x, y, deltaX, deltaY);
-        }
-      }, 80);
+      if (!accum.timer) {
+        accum.timer = window.setTimeout(() => {
+          const { x, y, deltaX, deltaY } = accum;
+          accum.deltaX = 0;
+          accum.deltaY = 0;
+          accum.timer = null;
+          if (Math.abs(deltaX) + Math.abs(deltaY) > 0) {
+            callbacksRef.current.onScroll(x, y, deltaX, deltaY);
+          }
+        }, 80);
+      }
     };
     element.addEventListener('wheel', onWheel, { passive: false });
     return () => {
@@ -174,7 +177,18 @@ export function PhoneFrame({
   }, []);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.button === 3) {
+      event.preventDefault();
+      callbacksRef.current.onPress('back');
+      return;
+    }
+    if (event.button === 4) {
+      event.preventDefault();
+      callbacksRef.current.onPress('home');
+      return;
+    }
     if (event.button !== 0) return;
+    screenRef.current?.focus({ preventScroll: true });
     const p = point(event.clientX, event.clientY);
     if (!p) return;
     startRef.current = { x: p.x, y: p.y, nx: p.nx, ny: p.ny };
@@ -303,11 +317,16 @@ export function PhoneFrame({
               if (event.button === 1) {
                 event.preventDefault();
                 callbacksRef.current.onPress('home');
+              } else if (event.button === 3 || event.button === 4) {
+                // The pointerdown handler already sent Back/Home; just stop
+                // Chromium's default history navigation.
+                event.preventDefault();
               }
             }}
             role="application"
             aria-label={`${device.name} live screen`}
-            title="Click to tap · drag to swipe · wheel to scroll · Ctrl/⌘-wheel to pinch · right-click for Back"
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+            title="Click to tap · drag to swipe · wheel or ↑/↓ to scroll · ←/→ to swipe · Ctrl/⌘-wheel to pinch · right-click for Back"
             tabIndex={0}
           >
             {frame ? (

@@ -237,7 +237,9 @@ function renderHome(
   dark: boolean,
   time: string,
   battery: number,
+  page: 0 | 1,
 ): string {
+  if (page === 1) return renderHomeSecondPage(platform, hot, time, battery);
   const installedApps = CATALOG.filter((app) => installed.has(app.id));
   const slots: Array<
     | { kind: 'app'; app: CatalogApp }
@@ -530,6 +532,78 @@ function renderBuiltinApp(
 }
 
 // ---------------------------------------------------------------------------
+// Home — widgets page
+// ---------------------------------------------------------------------------
+
+function renderHomeSecondPage(
+  platform: PhonePlatform,
+  hot: (h: Omit<Hotspot, 'label'> & { label: string }) => void,
+  time: string,
+  battery: number,
+): string {
+  const date = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+  const iconRow = ['Photos', 'Camera', 'Settings', 'Music'];
+  const icons = iconRow
+    .map((name, index) => {
+      const tile = BUILTIN_APPS.get(name);
+      if (!tile) return '';
+      const x = 30 + index * 95;
+      const y = 584;
+      return `<g>
+        ${systemTile(tile, x, y, 58)}
+        ${text(x + 29, y + 75, 10, 500, 'rgba(255,255,255,.72)', name, 'text-anchor="middle"')}
+      </g>`;
+    })
+    .join('');
+  for (const name of iconRow) {
+    const index = iconRow.indexOf(name);
+    hot({ x: 30 + index * 95, y: 584, w: 58, h: 58, label: `Open ${name}`, action: 'system', value: name });
+  }
+  return `<g>
+    <defs>
+      <radialGradient id="wpC" cx="78%" cy="8%" r="72%"><stop offset="0" stop-color="#31506a"/><stop offset=".55" stop-color="#101a25"/><stop offset="1" stop-color="#070a10"/></radialGradient>
+      <radialGradient id="wpD" cx="14%" cy="90%" r="70%"><stop offset="0" stop-color="#8d7cff" stop-opacity=".28"/><stop offset="1" stop-color="#080b12" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="402" height="874" fill="url(#wpC)"/><rect width="402" height="874" fill="url(#wpD)"/>
+    <circle cx="344" cy="120" r="160" fill="#7be0c4" opacity=".06"/>
+    ${statusBar(platform, false, time, battery)}
+    ${text(32, 98, 11, 650, 'rgba(255,255,255,.82)', date, 'letter-spacing=".2"')}
+    ${text(201, 224, 88, 250, '#ffffff', time, 'text-anchor="middle" letter-spacing="-4"')}
+    ${text(201, 256, 11, 500, 'rgba(255,255,255,.55)', 'Lisbon · Clear skies', 'text-anchor="middle"')}
+
+    ${rr(30, 318, 170, 156, 24, 'rgba(255,255,255,.09)')}
+    <rect x="30.5" y="318.5" width="169" height="155" rx="23.5" fill="none" stroke="rgba(255,255,255,.13)"/>
+    ${text(48, 352, 8.5, 600, 'rgba(255,255,255,.48)', 'WEATHER', 'letter-spacing="1.3"')}
+    ${text(48, 410, 40, 300, '#ffffff', '24°', 'letter-spacing="-1.5"')}
+    ${text(48, 438, 9.5, 500, 'rgba(255,255,255,.58)', 'H 26° · L 17°')}
+    <circle cx="162" cy="360" r="17" fill="rgba(255,212,120,.9)"/>
+    ${hot({ x: 30, y: 318, w: 170, h: 156, label: 'Open Weather', action: 'system', value: 'Weather' })}
+
+    ${rr(202, 318, 170, 156, 24, 'rgba(255,255,255,.09)')}
+    <rect x="202.5" y="318.5" width="169" height="155" rx="23.5" fill="none" stroke="rgba(255,255,255,.13)"/>
+    ${text(220, 352, 8.5, 600, 'rgba(255,255,255,.48)', 'CALENDAR', 'letter-spacing="1.3"')}
+    ${text(220, 410, 40, 300, '#ffffff', String(new Date().getDate()), 'letter-spacing="-1.5"')}
+    ${text(220, 438, 9.5, 500, 'rgba(255,255,255,.58)', '3 events today')}
+    ${rr(284, 364, 72, 20, 10, 'rgba(216,255,99,.14)')}
+    ${text(320, 378, 8, 700, '#d8ff63', 'DESIGN 10:30', 'text-anchor="middle" letter-spacing=".4"')}
+    ${hot({ x: 202, y: 318, w: 170, h: 156, label: 'Open Calendar', action: 'system', value: 'Calendar' })}
+
+    ${rr(30, 486, 342, 68, 20, 'rgba(255,255,255,.065)')}
+    ${text(48, 512, 9, 600, 'rgba(255,255,255,.45)', 'UP NEXT', 'letter-spacing="1.1"')}
+    ${text(48, 535, 13, 550, '#ffffff', 'Design review · 10:30')}
+    ${text(48, 549, 9, 450, 'rgba(255,255,255,.45)', 'Studio 2 · 4 people')}
+    ${icons}
+
+    ${rr(188, 696, 6, 6, 3, 'rgba(255,255,255,.28)')}${rr(202, 696, 6, 6, 3, 'rgba(255,255,255,.86)')}
+    ${homeIndicator(false)}
+  </g>`;
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -541,12 +615,17 @@ function renderStore(
   time: string,
   battery: number,
   query: string,
+  offset: number,
 ): string {
   const accent = platform === 'ios' ? '#0a84ff' : '#0f9d58';
   const title = platform === 'ios' ? 'App Store' : 'Google Play';
   const results = query ? searchCatalog(query) : CATALOG;
   const recommended = results.find((app) => !installed.has(app.id)) ?? results[0] ?? null;
-  const chart = results.filter((app) => app.id !== recommended?.id).slice(0, 4);
+  const candidates = results.filter((app) => app.id !== recommended?.id);
+  const chart = Array.from({ length: Math.min(4, candidates.length) }, (_, index) => {
+    const position = ((offset + index) % candidates.length + candidates.length) % candidates.length;
+    return candidates[position];
+  });
   const progressFor = (appId: string): number | null =>
     install && install.appId === appId
       ? Math.min(0.99, (Date.now() - install.startedAt) / install.duration)
@@ -1381,6 +1460,8 @@ export class DemoDevice {
   readonly id: string;
   private installed = new Set<string>(SEED_INSTALLED);
   private query = '';
+  private homePage: 0 | 1 = 0;
+  private storeOffset = 0;
   private stack: Screen[] = [{ kind: 'home' }];
   private install: DemoInstall | null = null;
   private battery = 86;
@@ -1402,6 +1483,8 @@ export class DemoDevice {
     this.stack = [{ kind: 'home' }];
     this.install = null;
     this.query = '';
+    this.homePage = 0;
+    this.storeOffset = 0;
     this.bootedAt = Date.now();
   }
 
@@ -1457,11 +1540,13 @@ export class DemoDevice {
 
   openStore(): void {
     this.query = '';
+    this.storeOffset = 0;
     if (this.currentScreen.kind !== 'store') this.stack.push({ kind: 'store' });
   }
 
   search(query: string): void {
     this.query = query;
+    this.storeOffset = 0;
     if (this.currentScreen.kind !== 'store') this.stack.push({ kind: 'store' });
   }
 
@@ -1500,6 +1585,7 @@ export class DemoDevice {
 
   home(): void {
     this.stack = [{ kind: 'home' }];
+    this.homePage = 0;
   }
 
   back(): boolean {
@@ -1574,9 +1660,18 @@ export class DemoDevice {
     let body: string;
 
     if (screen.kind === 'home') {
-      body = renderHome(this.platform, this.installed, hot, false, time, this.battery);
+      body = renderHome(this.platform, this.installed, hot, false, time, this.battery, this.homePage);
     } else if (screen.kind === 'store') {
-      body = renderStore(this.platform, this.installed, this.install, hot, time, this.battery, this.query);
+      body = renderStore(
+        this.platform,
+        this.installed,
+        this.install,
+        hot,
+        time,
+        this.battery,
+        this.query,
+        this.storeOffset,
+      );
     } else if (screen.kind === 'detail') {
       const app = CATALOG_BY_ID[screen.appId];
       body = renderDetail(app, this.platform, this.installed, this.install, hot, time, this.battery);
@@ -1634,6 +1729,35 @@ export class DemoDevice {
     </svg>`;
 
     return { svg, hotspots, width: DEMO_WIDTH, height: DEMO_HEIGHT };
+  }
+
+  swipe(x1: number, y1: number, x2: number, y2: number): boolean {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return false;
+    if (this.currentScreen.kind === 'home') {
+      if (Math.abs(dx) >= Math.abs(dy)) this.homePage = dx < 0 ? 1 : 0;
+      else this.homePage = dy < 0 ? 1 : 0;
+      return true;
+    }
+    if (Math.abs(dx) >= Math.abs(dy)) return this.back();
+    if (this.currentScreen.kind === 'store') {
+      this.storeOffset += dy < 0 ? 1 : -1;
+      return true;
+    }
+    return false;
+  }
+
+  scroll(_deltaX: number, deltaY: number): boolean {
+    if (this.currentScreen.kind === 'home') {
+      this.homePage = deltaY < 0 ? 1 : 0;
+      return true;
+    }
+    if (this.currentScreen.kind === 'store') {
+      this.storeOffset += deltaY > 0 ? 1 : -1;
+      return true;
+    }
+    return false;
   }
 
   tap(x: number, y: number): boolean {

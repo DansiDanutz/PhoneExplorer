@@ -108,6 +108,18 @@ export default function App(): React.ReactElement {
     const onKey = (event: KeyboardEvent): void => {
       const mod = event.metaKey || event.ctrlKey;
       if (modelsFor || settingsOpen || connectOpen || peekApp || guideOpen || state?.qr) return;
+      const target = event.target as HTMLElement | null;
+      const typing = Boolean(
+        target?.closest('input, textarea, select, [contenteditable]'),
+      );
+      if (!mod && !event.altKey && !typing && event.key.startsWith('Arrow')) {
+        event.preventDefault();
+        if (event.key === 'ArrowLeft') void actions.swipe(0.82, 0.5, 0.18, 0.5);
+        else if (event.key === 'ArrowRight') void actions.swipe(0.18, 0.5, 0.82, 0.5);
+        else if (event.key === 'ArrowUp') void actions.scroll(0.5, 0.5, 0, -240);
+        else if (event.key === 'ArrowDown') void actions.scroll(0.5, 0.5, 0, 240);
+        return;
+      }
       if (mod && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setTab('discover');
@@ -134,7 +146,7 @@ export default function App(): React.ReactElement {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focusMode, connectOpen, settingsOpen, peekApp, modelsFor, guideOpen, state?.qr]);
+  }, [actions, focusMode, connectOpen, settingsOpen, peekApp, modelsFor, guideOpen, state?.qr]);
 
   if (!state) return <BootScreen />;
 

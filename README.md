@@ -42,7 +42,7 @@ is always a user action. No phone? A complete interactive demo phone runs locall
 | --- | --- | --- |
 | Device discovery | `adb devices`, USB + Wi-Fi | `libimobiledevice` or `idb` |
 | Screen preview | `adb exec-out screencap` at 1–10 fps | `idb screenshot` or `idevicescreenshot` |
-| Touch control | tap, drag, wheel-scroll, long-press, pinch, Back/Home keys | tap, drag, wheel-scroll, Back/Home edge swipes |
+| Touch control | tap, drag, wheel/arrow scroll, long-press, pinch, Back/Home keys | tap, drag, wheel/arrow scroll, Back/Home edge swipes |
 | Multi-touch | scrcpy control channel (auto, Android 5+) | single touch via idb |
 | Store deep link | `market://details`, `market://search` | `itms-apps://` via `idb open-url` |
 | Install detection | watches `pm list packages` | watches `idb list-apps` |
@@ -147,8 +147,10 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **Installed** lists apps read from the device, including system apps matched to the
   catalog. Click any icon to launch it.
 - **Activity** is a timestamped log of every bridge command, launch and install event.
-- **Click the mirror** to tap; **drag** to swipe. **Wheel** scrolls, **hold** long-presses,
-  **right-click** is Back and **middle-click** is Home.
+- **Click the mirror** to tap; **drag** to swipe. **Wheel** or **↑/↓** scrolls, **←/→**
+  swipes, **hold** long-presses, **right-click** is Back and **middle-click** is Home.
+  Mouse Back/Forward buttons also send Back/Home. If scrolling feels backwards, turn on
+  **Reverse scroll** in Settings.
 - **Ctrl/⌘ + wheel** or the zoom buttons send a two-finger **pinch** on Android through the
   scrcpy control channel. On Android, tap, drag, scroll, long-press, Back and Home always
   use adb, so basic control does not depend on scrcpy starting.
@@ -274,8 +276,8 @@ docs/                        architecture, research, screenshots
   already wired for multi-touch.
 - **Pinch is Android-only.** It needs the scrcpy control channel; the iPhone bridge injects
   single touch, and WebDriverAgent-based pinch is future work.
-- **Demo scroll and pinch are static.** Tap, drag, Back and the install flow work; use a
-  real Android phone for native scroll and pinch.
+- **Demo gestures are simulated.** Swipe/wheel turn home pages or scroll the store; pinch
+  zooms the mirrored demo. App-level pinch needs a real Android phone.
 - **The scrcpy pinch path is not hardware-tested here.** It is implemented against
   scrcpy 3.3.3; single-touch input does not depend on it and always uses adb.
 - **Phone models are demo profiles.** They set name, OS, resolution and frame colour for

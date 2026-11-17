@@ -37,10 +37,37 @@ try {
   if (before === store) throw new Error('store did not open');
   const box = await page.locator('.phone-screen').boundingBox();
   if (!box) throw new Error('phone has no box');
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, -240);
+  await page.waitForTimeout(500);
+  if ((await page.locator('.phone-image').getAttribute('src')) === store) {
+    throw new Error('store wheel scroll did not change the chart');
+  }
+  await page.mouse.wheel(0, 240);
+  await page.waitForTimeout(500);
+  await page.mouse.click(cx, cy, { button: 'right' });
   await page.waitForTimeout(700);
   const back = await page.locator('.phone-image').getAttribute('src');
   if (back === store) throw new Error('right-click did not send Back');
+
+  // Arrow keys swipe / scroll the demo. The store hotspot only exists on
+  // the first home page, so it is a stable page marker.
+  const onFirstPage = async () =>
+    (await page.locator('.hotspot[aria-label="Open Play Store"]').count()) === 1;
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(450);
+  if (await onFirstPage()) throw new Error('ArrowLeft did not swipe the home screen');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(450);
+  if (!(await onFirstPage())) throw new Error('ArrowRight did not return to the first home page');
+  await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(450);
+  if (await onFirstPage()) throw new Error('ArrowUp did not scroll the home screen');
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(450);
+  if (!(await onFirstPage())) throw new Error('ArrowDown did not return to the first home page');
 
   // Every home tile is a real hit target, not just artwork.
   await page.locator('.hotspot[aria-label="Open Camera"]').click();
@@ -53,27 +80,28 @@ try {
   await page.screenshot({ path: join(shots, '32-camera.png') });
   await page.locator('.hotspot[aria-label="Back"]').click();
   await page.waitForTimeout(600);
-  if ((await page.locator('.phone-image').getAttribute('src')) !== back) {
-    throw new Error('Camera Back did not return home');
-  }
+  if (!(await onFirstPage())) throw new Error('Camera Back did not return home');
 
-  // Scroll / pinch / long-press explain that demo screens are static.
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, 200);
+  // Wheel scrolls the demo between home pages.
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, -240);
+  await page.waitForTimeout(450);
+  if (await onFirstPage()) throw new Error('wheel up did not scroll the home screen');
+  await page.mouse.wheel(0, 240);
+  await page.waitForTimeout(450);
+  if (!(await onFirstPage())) throw new Error('wheel down did not return to the first home page');
   await page.waitForTimeout(300);
-  const scrollToast = await page.locator('.toast-copy strong').last().textContent();
-  if (!scrollToast?.includes('Demo screens are static')) {
-    throw new Error(`unexpected scroll toast: ${scrollToast}`);
-  }
-  await page.waitForTimeout(700);
   await page.locator('.control-btn[aria-label="Pinch to zoom in"]').click();
   await page.waitForTimeout(300);
-  const pinchToast = await page.locator('.toast-copy strong').last().textContent();
-  if (!pinchToast?.includes('Pinch is not simulated')) {
-    throw new Error(`unexpected pinch toast: ${pinchToast}`);
-  }
-  await page.waitForTimeout(700);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const zoomTransform = await page.locator('.stage-phone-zoom').evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  if (zoomTransform === 'none') throw new Error('demo pinch did not zoom the mirror');
+  const zoomLabel = await page.locator('.control-state').textContent();
+  if (!zoomLabel?.includes('DEMO ZOOM')) throw new Error(`unexpected zoom label: ${zoomLabel}`);
+  await page.locator('.control-state').click();
+  await page.waitForTimeout(350);
+  await page.mouse.move(cx, cy);
   await page.mouse.down();
   await page.waitForTimeout(760);
   await page.mouse.up();
