@@ -159,10 +159,12 @@ action. PhoneExplorer opens the listing and detects the install when it lands.
 - **App understanding** opens **Artefacts** (⌘5), or use the red **Record** pill directly
   under the neon Screenshots button on the phone margin. **Record an artefact** starts a native
   Android `screenrecord` session and also captures a full-resolution phone screenshot every two
-  seconds. Move through the phone yourself — PhoneExplorer never taps the app. When you stop,
-  ffmpeg extracts scene/key frames, Tesseract labels the distinct screens, and the result is
-  saved as phone screenshots in **Library** plus a Pages-style document in Artefacts. A **Stop
-  recording** control is always available. The source MP4 is kept under
+  seconds. The Record pill opens two modes: **Auto walkthrough** (PhoneExplorer taps GGPoker's
+  Lobby → Tournaments → Casino while recording) and **Manual recording** (you move through the
+  phone; PhoneExplorer never taps). When you stop, ffmpeg extracts scene/key frames, Tesseract
+  labels the distinct screens, and the result is saved as phone screenshots in **Library** plus
+  a Pages-style document in Artefacts. A **Stop recording** control is always available. Auto
+  walkthrough only starts when GGPoker is the focused phone app. The source MP4 is kept under
   `~/Pictures/PhoneExplorer/Recordings`. This requires Android `screenrecord`, `ffmpeg`, and
   Tesseract; the previous automatic tap explorer is no longer shipped.
 - **Screenshot** with the camera button on the phone’s right margin, or **⌘S**. Every capture

@@ -26,7 +26,9 @@ interface PhoneFrameProps {
   recording: boolean;
   recordingProcessing: boolean;
   recordingElapsed: number;
-  onToggleRecording: () => void;
+  onStartManual: () => void;
+  onStartAuto: () => void;
+  onStopRecording: () => void;
   onStartPreview: () => void;
 }
 
@@ -92,7 +94,9 @@ export function PhoneFrame({
   recording,
   recordingProcessing,
   recordingElapsed,
-  onToggleRecording,
+  onStartManual,
+  onStartAuto,
+  onStopRecording,
   onStartPreview,
 }: PhoneFrameProps): ReactElement {
   const screenRef = useRef<HTMLDivElement>(null);
@@ -119,6 +123,7 @@ export function PhoneFrame({
   });
   const [ripple, setRipple] = useState<{ x: number; y: number; id: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [recordMenuOpen, setRecordMenuOpen] = useState(false);
 
   frameRef.current = frame;
   callbacksRef.current = { onScroll, onPinch, onLongPress, onPress };
@@ -386,10 +391,14 @@ export function PhoneFrame({
         <button
           type="button"
           className={`phone-side phone-side--record ${recording ? 'is-recording' : ''}`}
-          onClick={onToggleRecording}
+          onClick={() => {
+            if (recording || recordingProcessing) onStopRecording();
+            else setRecordMenuOpen((open) => !open);
+          }}
           disabled={recordingProcessing}
-          title={recording ? 'Stop recording' : 'Record the phone'}
-          aria-label={recording ? 'Stop recording' : 'Record the phone'}
+          aria-expanded={recordMenuOpen}
+          title={recording ? 'Stop recording' : 'Choose recording mode'}
+          aria-label={recording ? 'Stop recording' : 'Choose recording mode'}
         >
           {recording || recordingProcessing ? (
             <span className="record-stop-ui">
@@ -404,6 +413,33 @@ export function PhoneFrame({
             <img src={recordButton} alt="" draggable={false} />
           )}
         </button>
+        {recordMenuOpen && !recording ? (
+          <div className="record-menu" role="menu" aria-label="Recording mode">
+            <span className="record-menu-title">Recording mode</span>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setRecordMenuOpen(false);
+                onStartAuto();
+              }}
+            >
+              <strong>Auto walkthrough</strong>
+              <span>I tap GGPoker’s Lobby, Tournaments and Casino.</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setRecordMenuOpen(false);
+                onStartManual();
+              }}
+            >
+              <strong>Manual recording</strong>
+              <span>You move through the phone; I record and screenshot.</span>
+            </button>
+          </div>
+        ) : null}
         <div className="phone-bezel">
           <div
             className="phone-screen"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ArtefactSection, CatalogApp, PhonePlatform, Screenshot } from '@shared/types';
 import { usePhone } from './hooks/usePhone';
 import { DeviceRail } from './components/DeviceRail';
@@ -84,6 +84,10 @@ export default function App(): React.ReactElement {
   const [recordingStartedAt, setRecordingStartedAt] = useState(0);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [recordingProcessing, setRecordingProcessing] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<'manual' | 'auto' | null>(null);
+  const autoCancel = useRef(false);
+  const recordingRef = useRef(false);
+  const recordingModeRef = useRef<'manual' | 'auto' | null>(null);
 
   const openModels = (platform: PhonePlatform): void => {
     setModelsReturnToSettings(settingsOpen);
@@ -174,7 +178,7 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener('keydown', onKey);
   }, [actions, focusMode, connectOpen, settingsOpen, peekApp, modelsFor, guideOpen, state?.qr]);
 
-  const startPhoneRecording = async (): Promise<void> => {
+  const startPhoneRecording = async (mode: 'manual' | 'auto'): Promise<void> => {
     if (!state || recording || recordingProcessing) return;
     const active = state.devices.find((candidate) => candidate.id === state.activeDeviceId) ?? null;
     if (!active || active.platform !== 'android' || active.isDemo) {
@@ -185,11 +189,30 @@ export default function App(): React.ReactElement {
       );
       return;
     }
+    if (mode === 'auto') {
+      const nodes = await actions.dumpAndroidUi();
+      const packageName = nodes.find(
+        (node) => node.packageName && !/launcher|systemui|android/i.test(node.packageName),
+      )?.packageName;
+      if (!packageName || !/nsus\.poker|ggpoker/i.test(packageName)) {
+        actions.toast(
+          'error',
+          'Open GGPoker first',
+          'Auto walkthrough is mapped to GGPoker. Open the app, then choose Auto again.',
+        );
+        return;
+      }
+    }
     try {
       const started = await actions.startPhoneRecording();
+      autoCancel.current = false;
+      recordingRef.current = true;
+      recordingModeRef.current = mode;
+      setRecordingMode(mode);
       setRecording(true);
       setRecordingStartedAt(started.startedAt);
       setRecordingElapsed(0);
+      if (mode === 'auto') void runAutoWalkthrough();
     } catch (error) {
       actions.toast(
         'error',
@@ -198,6 +221,40 @@ export default function App(): React.ReactElement {
       );
     }
   };
+
+  async function runAutoWalkthrough(): Promise<void> {
+    const steps: Array<{ x: number; y: number; label: string }> = [
+      { x: 0.5, y: 0.95, label: 'Lobby' },
+      { x: 0.312, y: 0.95, label: 'Tournaments' },
+      { x: 0.5, y: 0.95, label: 'Lobby' },
+      { x: 0.688, y: 0.95, label: 'Casino' },
+      { x: 0.5, y: 0.95, label: 'Lobby' },
+    ];
+    try {
+      for (const step of steps) {
+        if (autoCancel.current) return;
+        await actions.tap(step.x, step.y);
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        if (autoCancel.current) return;
+        if (step.label !== 'Lobby') {
+          await actions.capturePhoneScreen({
+            label: `Auto · ${step.label}`,
+            caption: `Auto walkthrough: GGPoker ${step.label}. The tap and screenshot were taken inside the phone.`,
+            group: 'recording',
+            quiet: true,
+          });
+        }
+      }
+      if (!autoCancel.current) await stopPhoneRecording();
+    } catch (error) {
+      actions.toast(
+        'error',
+        'Auto walkthrough stopped',
+        error instanceof Error ? error.message : String(error),
+      );
+      if (recordingRef.current) await stopPhoneRecording();
+    }
+  }
 
   const buildRecordingArtefact = async (
     shots: Screenshot[],
@@ -250,8 +307,14 @@ export default function App(): React.ReactElement {
       return;
     }
     const doc = await actions.saveArtefact({
-      title: 'Recorded phone — App Walkthrough',
-      subtitle: `A user-driven phone session. ${sections.length} distinct screens selected from ${shots.length} live screenshots and video frames.${videoPath ? ' The source video is saved beside the recording library.' : ''}`,
+      title:
+        recordingModeRef.current === 'auto'
+          ? 'Auto phone — App Walkthrough'
+          : 'Recorded phone — App Walkthrough',
+      subtitle:
+        recordingModeRef.current === 'auto'
+          ? `An automatic, phone-only GGPoker walkthrough. ${sections.length} distinct screens selected from ${shots.length} live screenshots and video frames.${videoPath ? ' The source video is saved beside the recording library.' : ''}`
+          : `A user-driven phone session. ${sections.length} distinct screens selected from ${shots.length} live screenshots and video frames.${videoPath ? ' The source video is saved beside the recording library.' : ''}`,
       deviceName: `${state?.devices.find((candidate) => candidate.id === state.activeDeviceId)?.name ?? 'Phone'} · Android`,
       sections,
       quiet: true,
@@ -262,10 +325,12 @@ export default function App(): React.ReactElement {
   };
 
   const stopPhoneRecording = async (): Promise<void> => {
-    if (!recording || recordingProcessing) return;
+    autoCancel.current = true;
+    if (!recordingRef.current || recordingProcessing) return;
     setRecordingProcessing(true);
     try {
       const result = await actions.stopPhoneRecording();
+      recordingRef.current = false;
       setRecording(false);
       await buildRecordingArtefact(result.screenshots, result.videoPath);
     } catch (error) {
@@ -323,9 +388,9 @@ export default function App(): React.ReactElement {
           recording={recording}
           recordingProcessing={recordingProcessing}
           recordingElapsed={recordingElapsed}
-          onToggleRecording={() =>
-            recording ? void stopPhoneRecording() : void startPhoneRecording()
-          }
+          onStartManual={() => void startPhoneRecording('manual')}
+          onStartAuto={() => void startPhoneRecording('auto')}
+          onStopRecording={() => void stopPhoneRecording()}
         />
 
         {!focusMode ? (
@@ -335,7 +400,7 @@ export default function App(): React.ReactElement {
             tab={tab}
             onTab={setTab}
             onPeek={(app) => setPeekApp(app)}
-            onRecord={() => void startPhoneRecording()}
+            onRecord={() => void startPhoneRecording('manual')}
             onStop={() => void stopPhoneRecording()}
             recording={recording}
             recordingProcessing={recordingProcessing}
@@ -356,11 +421,19 @@ export default function App(): React.ReactElement {
         <div className="walkthrough-hud recording-hud" role="status">
           <span className={`recording-dot ${recordingProcessing ? 'is-processing' : ''}`} />
           <div className="walkthrough-copy">
-            <strong>{recordingProcessing ? 'Extracting screenshots from the recording…' : 'Recording the phone'}</strong>
+            <strong>
+              {recordingProcessing
+                ? 'Extracting screenshots from the recording…'
+                : recordingMode === 'auto'
+                  ? 'Auto walkthrough recording'
+                  : 'Recording the phone'}
+            </strong>
             <span>
               {recordingProcessing
                 ? 'Video frames and live screenshots are being collected.'
-                : `${String(Math.floor(recordingElapsed / 60)).padStart(2, '0')}:${String(recordingElapsed % 60).padStart(2, '0')} · screenshots every 2 seconds · move through the app`}
+                : recordingMode === 'auto'
+                  ? 'Navigating GGPoker: Lobby → Tournaments → Casino · screenshots every 2 seconds'
+                  : `${String(Math.floor(recordingElapsed / 60)).padStart(2, '0')}:${String(recordingElapsed % 60).padStart(2, '0')} · screenshots every 2 seconds · move through the app`}
             </span>
           </div>
           {recording ? (
