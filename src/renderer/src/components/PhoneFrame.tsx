@@ -9,6 +9,7 @@ import {
 import type { DeviceInfo, FramePayload, KeyAction, ScreenshotRequest } from '@shared/types';
 import { shade } from '../lib/format';
 import { Icon } from '../lib/icons';
+import screenshotButton from '../assets/neon-screenshots-button.png';
 
 interface PhoneFrameProps {
   device: DeviceInfo;
@@ -371,7 +372,7 @@ export function PhoneFrame({
           title="Save a screenshot"
           aria-label="Save a screenshot"
         >
-          <Icon name="camera" size={14} />
+          <img src={screenshotButton} alt="" draggable={false} />
         </button>
         <div className="phone-bezel">
           <div

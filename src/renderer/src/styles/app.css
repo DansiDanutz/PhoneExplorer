@@ -4006,30 +4006,36 @@ button.phone-side:focus-visible {
 }
 
 .phone-side--shot {
-  right: -42px;
-  top: 39%;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(216, 255, 99, 0.28);
-  border-radius: 50%;
-  background: rgba(11, 14, 18, 0.96);
-  color: var(--accent);
-  box-shadow:
-    0 0 0 3px rgba(216, 255, 99, 0.04),
-    0 8px 18px rgba(0, 0, 0, 0.45);
-  transition: transform 0.14s var(--ease), background 0.14s var(--ease);
+  right: -152px;
+  top: 35%;
+  width: 144px;
+  height: 48px;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  box-shadow: none;
+  transition: transform 0.14s var(--ease), filter 0.14s var(--ease);
 }
 
 .phone-side--shot::before {
   inset: -5px;
 }
 
+.phone-side--shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .phone-side--shot:hover {
-  transform: scale(1.06);
-  background: rgba(216, 255, 99, 0.14);
-  box-shadow: 0 0 16px rgba(216, 255, 99, 0.4);
+  transform: scale(1.04);
+  background: transparent;
+  filter: drop-shadow(0 0 12px rgba(190, 255, 120, 0.45));
+  box-shadow: none;
 }
 
 /* Screenshot library */
