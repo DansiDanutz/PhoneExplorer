@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import { app, dialog, nativeImage, shell, type BrowserWindow } from 'electron';
 import QRCode from 'qrcode';
 import {
@@ -1400,7 +1400,7 @@ export class DeviceManager {
     if (this.artefactRoot) return this.artefactRoot;
     const shots = await this.ensureScreenshotDir();
     const preferred =
-      process.env.PHONEEXPLORER_ARTEFACT_DIR || join(dirname(shots), 'Artefacts');
+      process.env.PHONEEXPLORER_ARTEFACT_DIR || join(shots, 'Artefacts');
     try {
       await fs.mkdir(preferred, { recursive: true });
       this.artefactRoot = preferred;
