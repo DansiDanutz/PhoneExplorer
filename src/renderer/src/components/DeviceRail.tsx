@@ -3,6 +3,7 @@ import type { AppState, DeviceInfo } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
 import { truncate } from '../lib/format';
 import { Icon } from '../lib/icons';
+import themeOrbital from '../assets/themes/earth-beyond-the-orbital-window.png';
 
 interface DeviceRailProps {
   state: AppState;
@@ -260,6 +261,28 @@ export function DeviceRail({
             </div>
           </div>
         ) : null}
+
+        <div className="rail-section rail-themes">
+          <div className="rail-heading">
+            <span>Themes</span>
+            <span className="count">1</span>
+          </div>
+          <figure className="theme-card">
+            <div className="theme-card-art">
+              <img
+                src={themeOrbital}
+                alt="Earth seen from an orbital cockpit window"
+                loading="lazy"
+                decoding="async"
+              />
+              <span className="theme-badge">Theme 01</span>
+            </div>
+            <figcaption className="theme-card-copy">
+              <strong>Earth Beyond the Orbital Window</strong>
+              <span>Orbital · deep space</span>
+            </figcaption>
+          </figure>
+        </div>
       </div>
 
       <div className="rail-footer">
