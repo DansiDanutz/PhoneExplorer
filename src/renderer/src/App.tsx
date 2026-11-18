@@ -10,7 +10,7 @@ import { Stage } from './components/Stage';
 import { TitleBar } from './components/TitleBar';
 import { Toasts } from './components/Toasts';
 import { Icon } from './lib/icons';
-import { readStageTheme, writeStageTheme, type StageTheme } from './lib/theme';
+import { readStageTheme, themeOption, writeStageTheme, type StageTheme } from './lib/theme';
 
 function BootScreen(): React.ReactElement {
   return (
@@ -132,12 +132,11 @@ export default function App(): React.ReactElement {
     if (next === stageTheme) return;
     setStageTheme(next);
     writeStageTheme(next);
+    const option = themeOption(next);
     actions.toast(
       'success',
-      next === 'earth-orbital' ? 'Theme applied' : 'Default theme restored',
-      next === 'earth-orbital'
-        ? 'Earth Beyond the Orbital Window is now behind the phone.'
-        : 'The green stage glow is back.',
+      option ? `${option.name} applied` : 'Default theme restored',
+      option ? 'The stage backdrop now uses this theme.' : 'The green stage glow is back.',
     );
   };
 

@@ -1,10 +1,9 @@
-import type { ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { AppState, DeviceInfo } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
 import { truncate } from '../lib/format';
 import { Icon } from '../lib/icons';
-import type { StageTheme } from '../lib/theme';
-import themeOrbital from '../assets/themes/earth-beyond-the-orbital-window.png';
+import { STAGE_THEMES, type StageTheme } from '../lib/theme';
 
 interface DeviceRailProps {
   state: AppState;
@@ -63,6 +62,38 @@ export function DeviceRail({
   const active = state.devices.find((device) => device.id === state.activeDeviceId) ?? null;
   const toolsReady = state.tools.filter((tool) => tool.found).length;
   const allReady = toolsReady === state.tools.length;
+  const themeTrack = useRef<HTMLDivElement>(null);
+  const [themeIndex, setThemeIndex] = useState(() =>
+    Math.max(0, STAGE_THEMES.findIndex((option) => option.id === theme)),
+  );
+
+  const scrollToTheme = (index: number): void => {
+    const track = themeTrack.current;
+    const target = track?.children[index] as HTMLElement | undefined;
+    if (!track || !target) return;
+    track.scrollTo({ left: target.offsetLeft, behavior: 'smooth' });
+  };
+
+  const handleThemeScroll = (): void => {
+    const track = themeTrack.current;
+    if (!track) return;
+    const first = track.children[0] as HTMLElement | undefined;
+    const second = track.children[1] as HTMLElement | undefined;
+    const step = first && second ? second.offsetLeft - first.offsetLeft : track.clientWidth;
+    if (step <= 0) return;
+    setThemeIndex(
+      Math.max(0, Math.min(STAGE_THEMES.length - 1, Math.round(track.scrollLeft / step))),
+    );
+  };
+
+  useEffect(() => {
+    const index = STAGE_THEMES.findIndex((option) => option.id === theme);
+    const track = themeTrack.current;
+    const target = index >= 0 ? (track?.children[index] as HTMLElement | undefined) : undefined;
+    if (!track || !target) return;
+    track.scrollTo({ left: target.offsetLeft, behavior: 'auto' });
+    setThemeIndex(index);
+  }, [theme]);
   const demoInfo = (platform: 'android' | 'ios'): DeviceInfo | null =>
     state.devices.find((device) => device.id === `demo-${platform}`) ?? null;
   const demoModel = (platform: 'android' | 'ios') => {
@@ -270,50 +301,107 @@ export function DeviceRail({
         <div className="rail-section rail-themes">
           <div className="rail-heading">
             <span>Themes</span>
-            <span className="count">1</span>
-          </div>
-          <figure className={`theme-card ${theme === 'earth-orbital' ? 'is-applied' : ''}`}>
-            <div className="theme-card-art">
-              <img
-                src={themeOrbital}
-                alt="Earth seen from an orbital cockpit window"
-                loading="lazy"
-                decoding="async"
-              />
-              <span className="theme-badge">Theme 01</span>
+            <span className="count">{STAGE_THEMES.length}</span>
+            <div className="theme-nav">
               <button
                 type="button"
-                className={`theme-apply ${theme === 'earth-orbital' ? 'is-applied' : ''}`}
-                onClick={() =>
-                  onApplyTheme(theme === 'earth-orbital' ? 'default' : 'earth-orbital')
-                }
-                aria-pressed={theme === 'earth-orbital'}
-                aria-label={
-                  theme === 'earth-orbital'
-                    ? 'Remove the Earth Beyond the Orbital Window theme'
-                    : 'Apply the Earth Beyond the Orbital Window theme'
-                }
-                title={
-                  theme === 'earth-orbital'
-                    ? 'Remove this theme and restore the green stage glow'
-                    : 'Apply this theme behind the phone'
-                }
+                className="theme-nav-btn"
+                onClick={() => scrollToTheme(themeIndex - 1)}
+                disabled={themeIndex === 0}
+                title="Previous theme"
+                aria-label="Previous theme"
               >
-                {theme === 'earth-orbital' ? (
-                  <>
-                    <Icon name="check" size={11} />
-                    Applied
-                  </>
-                ) : (
-                  'Apply'
-                )}
+                <Icon name="chevron-left" size={12} />
+              </button>
+              <button
+                type="button"
+                className="theme-nav-btn"
+                onClick={() => scrollToTheme(themeIndex + 1)}
+                disabled={themeIndex === STAGE_THEMES.length - 1}
+                title="Next theme"
+                aria-label="Next theme"
+              >
+                <Icon name="chevron-right" size={12} />
               </button>
             </div>
-            <figcaption className="theme-card-copy">
-              <strong>Earth Beyond the Orbital Window</strong>
-              <span>Orbital · deep space</span>
-            </figcaption>
-          </figure>
+          </div>
+
+          <div
+            className="theme-carousel"
+            role="group"
+            aria-roledescription="carousel"
+            aria-label="Theme examples"
+          >
+            <div className="theme-track" ref={themeTrack} onScroll={handleThemeScroll}>
+              {STAGE_THEMES.map((option, index) => {
+                const applied = theme === option.id;
+                return (
+                  <figure
+                    key={option.id}
+                    className={`theme-card ${applied ? 'is-applied' : ''}`}
+                    role="group"
+                    aria-roledescription="slide"
+                    aria-label={`${index + 1} of ${STAGE_THEMES.length}: ${option.name}`}
+                  >
+                    <div className="theme-card-art">
+                      <img
+                        src={option.image}
+                        alt={`${option.name} theme preview`}
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        decoding="async"
+                        style={{ objectPosition: option.objectPosition }}
+                        draggable={false}
+                      />
+                      <span className="theme-badge">{option.badge}</span>
+                      <button
+                        type="button"
+                        className={`theme-apply ${applied ? 'is-applied' : ''}`}
+                        onClick={() => onApplyTheme(applied ? 'default' : option.id)}
+                        aria-pressed={applied}
+                        aria-label={
+                          applied
+                            ? `Remove the ${option.name} theme`
+                            : `Apply the ${option.name} theme`
+                        }
+                        title={
+                          applied
+                            ? 'Remove this theme and restore the green stage glow'
+                            : 'Apply this theme behind the phone'
+                        }
+                      >
+                        {applied ? (
+                          <>
+                            <Icon name="check" size={11} />
+                            Applied
+                          </>
+                        ) : (
+                          'Apply'
+                        )}
+                      </button>
+                      {index === themeIndex ? (
+                        <div className="theme-dots" role="group" aria-label="Choose a theme">
+                          {STAGE_THEMES.map((dot, dotIndex) => (
+                            <button
+                              key={dot.id}
+                              type="button"
+                              className={`theme-dot ${dotIndex === themeIndex ? 'is-active' : ''}`}
+                              onClick={() => scrollToTheme(dotIndex)}
+                              aria-label={`Show ${dot.name}`}
+                              aria-current={dotIndex === themeIndex ? 'true' : undefined}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <figcaption className="theme-card-copy">
+                      <strong>{option.name}</strong>
+                      <span>{option.subtitle}</span>
+                    </figcaption>
+                  </figure>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 

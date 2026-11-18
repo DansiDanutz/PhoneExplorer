@@ -4,8 +4,7 @@ import type { PhoneActions } from '../hooks/usePhone';
 import { storeName } from '../lib/format';
 import { Icon } from '../lib/icons';
 import { PhoneFrame } from './PhoneFrame';
-import themeOrbital from '../assets/themes/earth-beyond-the-orbital-window.png';
-import type { StageTheme } from '../lib/theme';
+import { themeOption, type StageTheme } from '../lib/theme';
 
 interface StageProps {
   state: AppState;
@@ -25,12 +24,16 @@ interface StageProps {
 }
 
 function ThemeBackdrop({ theme }: { theme: StageTheme }): ReactElement | null {
-  if (theme !== 'earth-orbital') return null;
+  const option = themeOption(theme);
+  if (!option) return null;
   return (
     <div
       className="stage-theme"
       aria-hidden="true"
-      style={{ backgroundImage: `url(${themeOrbital})` }}
+      style={{
+        backgroundImage: `url(${option.image})`,
+        backgroundPosition: option.objectPosition,
+      }}
     />
   );
 }
