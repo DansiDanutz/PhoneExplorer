@@ -10,6 +10,7 @@ import { Stage } from './components/Stage';
 import { TitleBar } from './components/TitleBar';
 import { Toasts } from './components/Toasts';
 import { Icon } from './lib/icons';
+import { readStageTheme, writeStageTheme, type StageTheme } from './lib/theme';
 
 function BootScreen(): React.ReactElement {
   return (
@@ -102,6 +103,7 @@ export default function App(): React.ReactElement {
   const [modelsReturnToSettings, setModelsReturnToSettings] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [stageTheme, setStageTheme] = useState<StageTheme>(readStageTheme);
   const [recording, setRecording] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState(0);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
@@ -124,6 +126,19 @@ export default function App(): React.ReactElement {
       setModelsReturnToSettings(false);
       setSettingsOpen(true);
     }
+  };
+
+  const applyStageTheme = (next: StageTheme): void => {
+    if (next === stageTheme) return;
+    setStageTheme(next);
+    writeStageTheme(next);
+    actions.toast(
+      'success',
+      next === 'earth-orbital' ? 'Theme applied' : 'Default theme restored',
+      next === 'earth-orbital'
+        ? 'Earth Beyond the Orbital Window is now behind the phone.'
+        : 'The green stage glow is back.',
+    );
   };
 
   useEffect(() => {
@@ -391,11 +406,14 @@ export default function App(): React.ReactElement {
             onOpenConnect={() => setConnectOpen(true)}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenModels={openModels}
+            theme={stageTheme}
+            onApplyTheme={applyStageTheme}
           />
         ) : null}
 
         <Stage
           state={state}
+          theme={stageTheme}
           frame={frame}
           frameAge={frameAge}
           actions={actions}

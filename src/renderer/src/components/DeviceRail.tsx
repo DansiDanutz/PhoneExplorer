@@ -3,6 +3,7 @@ import type { AppState, DeviceInfo } from '@shared/types';
 import type { PhoneActions } from '../hooks/usePhone';
 import { truncate } from '../lib/format';
 import { Icon } from '../lib/icons';
+import type { StageTheme } from '../lib/theme';
 import themeOrbital from '../assets/themes/earth-beyond-the-orbital-window.png';
 
 interface DeviceRailProps {
@@ -11,6 +12,8 @@ interface DeviceRailProps {
   onOpenConnect: () => void;
   onOpenSettings: () => void;
   onOpenModels: (platform: 'android' | 'ios') => void;
+  theme: StageTheme;
+  onApplyTheme: (theme: StageTheme) => void;
 }
 
 function DeviceCard({
@@ -53,6 +56,8 @@ export function DeviceRail({
   onOpenConnect,
   onOpenSettings,
   onOpenModels,
+  theme,
+  onApplyTheme,
 }: DeviceRailProps): ReactElement {
   const real = state.devices.filter((device) => !device.isDemo);
   const active = state.devices.find((device) => device.id === state.activeDeviceId) ?? null;
@@ -267,7 +272,7 @@ export function DeviceRail({
             <span>Themes</span>
             <span className="count">1</span>
           </div>
-          <figure className="theme-card">
+          <figure className={`theme-card ${theme === 'earth-orbital' ? 'is-applied' : ''}`}>
             <div className="theme-card-art">
               <img
                 src={themeOrbital}
@@ -276,6 +281,33 @@ export function DeviceRail({
                 decoding="async"
               />
               <span className="theme-badge">Theme 01</span>
+              <button
+                type="button"
+                className={`theme-apply ${theme === 'earth-orbital' ? 'is-applied' : ''}`}
+                onClick={() =>
+                  onApplyTheme(theme === 'earth-orbital' ? 'default' : 'earth-orbital')
+                }
+                aria-pressed={theme === 'earth-orbital'}
+                aria-label={
+                  theme === 'earth-orbital'
+                    ? 'Remove the Earth Beyond the Orbital Window theme'
+                    : 'Apply the Earth Beyond the Orbital Window theme'
+                }
+                title={
+                  theme === 'earth-orbital'
+                    ? 'Remove this theme and restore the green stage glow'
+                    : 'Apply this theme behind the phone'
+                }
+              >
+                {theme === 'earth-orbital' ? (
+                  <>
+                    <Icon name="check" size={11} />
+                    Applied
+                  </>
+                ) : (
+                  'Apply'
+                )}
+              </button>
             </div>
             <figcaption className="theme-card-copy">
               <strong>Earth Beyond the Orbital Window</strong>

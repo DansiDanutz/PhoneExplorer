@@ -4,6 +4,8 @@ import type { PhoneActions } from '../hooks/usePhone';
 import { storeName } from '../lib/format';
 import { Icon } from '../lib/icons';
 import { PhoneFrame } from './PhoneFrame';
+import themeOrbital from '../assets/themes/earth-beyond-the-orbital-window.png';
+import type { StageTheme } from '../lib/theme';
 
 interface StageProps {
   state: AppState;
@@ -19,6 +21,18 @@ interface StageProps {
   onStartManual: () => void;
   onStartAuto: () => void;
   onStopRecording: () => void;
+  theme: StageTheme;
+}
+
+function ThemeBackdrop({ theme }: { theme: StageTheme }): ReactElement | null {
+  if (theme !== 'earth-orbital') return null;
+  return (
+    <div
+      className="stage-theme"
+      aria-hidden="true"
+      style={{ backgroundImage: `url(${themeOrbital})` }}
+    />
+  );
 }
 
 export function Stage({
@@ -35,6 +49,7 @@ export function Stage({
   onStartManual,
   onStartAuto,
   onStopRecording,
+  theme,
 }: StageProps): ReactElement {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [text, setText] = useState('');
@@ -74,7 +89,8 @@ export function Stage({
 
   if (!device) {
     return (
-      <section className="stage">
+      <section className={`stage ${theme === 'earth-orbital' ? 'has-theme' : ''}`}>
+        <ThemeBackdrop theme={theme} />
         <div className="stage-empty">
           <span className="stage-empty-icon">
             <Icon name="device" size={28} />
@@ -116,7 +132,8 @@ export function Stage({
   };
 
   return (
-    <section className="stage">
+    <section className={`stage ${theme === 'earth-orbital' ? 'has-theme' : ''}`}>
+      <ThemeBackdrop theme={theme} />
       <div className="stage-top">
         <div className="stage-title">
           <div className="eyebrow">
