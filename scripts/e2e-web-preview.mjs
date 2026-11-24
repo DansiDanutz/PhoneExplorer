@@ -21,7 +21,7 @@ try {
   app = await electron.launch({executablePath: process.argv[2], args: process.argv[2] ? ['--demo'] : ['.', '--demo'], env});
   const page = await app.firstWindow();
   await page.locator('.status-pill').click();
-  await page.getByLabel('iPhone model').selectOption('iPhone 18 Pro Max');
+  await page.getByLabel('iPhone model', {exact:true}).selectOption('iPhone 18 Pro Max');
   await page.getByLabel('iPhone web preview').fill('http://127.0.0.1:'+server.address().port);
   await page.getByRole('button', {name:'Preview', exact:true}).click();
   let timer;
