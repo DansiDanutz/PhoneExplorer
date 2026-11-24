@@ -19,6 +19,7 @@ import type {
   ServerEvent,
   Settings,
 } from '../shared/types';
+import { openWebPreview, closeWebPreviews, previewModels } from './services/web-preview';
 import { DeviceManager } from './services/manager';
 import { startMcpBridge, type BridgeHandle } from './bridge';
 
@@ -223,6 +224,8 @@ function registerIpc(instance: DeviceManager): void {
     });
   };
 
+  handle('phone:web-models', () => previewModels);
+  handle('phone:web-preview', openWebPreview);
   handle('phone:state', () => instance.getState());
   handle('phone:refresh', () => instance.refreshDevices());
   handle('phone:select', (id: string) => instance.selectDevice(id));
@@ -351,6 +354,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  closeWebPreviews();
   void mcpBridge?.close();
   mcpBridge = null;
   manager?.dispose();

@@ -349,6 +349,8 @@ export type ServerEvent =
   | { type: 'preview'; active: boolean; reason?: string };
 
 export interface PhoneAPI {
+  webModels(): Promise<string[]>;
+  openWebPreview(url: string, model: string): Promise<void>;
   getState(): Promise<AppState>;
   refresh(): Promise<AppState>;
   selectDevice(deviceId: string): Promise<AppState>;

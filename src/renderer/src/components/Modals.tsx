@@ -49,6 +49,12 @@ interface ConnectProps {
 }
 
 export function ConnectSheet({ state, actions, onClose }: ConnectProps): ReactElement {
+  const [webModels, setWebModels] = useState<string[]>([]);
+  const [webModel, setWebModel] = useState('iPhone 13');
+  useEffect(() => { void window.phone.webModels().then(setWebModels).catch(() => setWebError('Unable to load iPhone profiles.')); }, []);
+  const [webUrl, setWebUrl] = useState('');
+  const [opening, setOpening] = useState(false);
+  const [webError, setWebError] = useState('');
   const [address, setAddress] = useState('');
   const adb = state.tools.find((tool) => tool.id === 'adb');
   const ios = state.tools.find((tool) => tool.id === 'ios');
@@ -162,6 +168,25 @@ export function ConnectSheet({ state, actions, onClose }: ConnectProps): ReactEl
             </div>
             <span className={`status-dot ${ios?.found ? 'ok' : 'warn'}`} />
           </div>
+          <form className="wifi-form" onSubmit={async event => {
+            event.preventDefault(); setOpening(true); setWebError('');
+            try { await window.phone.openWebPreview(webUrl, webModel); } catch (err) {
+              setWebError(err instanceof Error ? err.message : String(err));
+            } finally { setOpening(false); }
+          }}>
+            <label htmlFor="iphone-web-model">iPhone model</label>
+            <select id="iphone-web-model" value={webModel} onChange={e => setWebModel(e.target.value)}>
+              {webModels.map(name => <option key={name}>{name}</option>)}
+            </select>
+            <label htmlFor="iphone-web-preview">iPhone web preview</label>
+            <div className="wifi-row">
+              <input id="iphone-web-preview" type="url" required placeholder="https://example.com"
+                value={webUrl} onChange={e => setWebUrl(e.target.value)} />
+              <button className="btn btn-ghost btn-sm" disabled={opening || !webModels.length}>{opening ? 'Opening…' : 'Preview'}</button>
+            </div>
+            <span className="field-hint">Mobile WebKit with iPhone dimensions and touch. No phone required; Safari browser bars are not simulated.</span>
+            {webError && <span role="alert">{webError}</span>}
+          </form>
           <ol className="steps">
             <li>
               <span className="step-num">1</span>
