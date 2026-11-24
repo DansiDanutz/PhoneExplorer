@@ -15,6 +15,8 @@ const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
   ipcRenderer.invoke(channel, ...args) as Promise<T>;
 
 const api: PhoneAPI = {
+  webModels: () => invoke('phone:web-models'),
+  openWebPreview: (url, model) => invoke('phone:web-preview', url, model),
   getState: () => invoke('phone:state'),
   refresh: () => invoke('phone:refresh'),
   selectDevice: (deviceId: string) => invoke('phone:select', deviceId),

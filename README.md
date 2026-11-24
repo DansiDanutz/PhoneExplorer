@@ -369,3 +369,13 @@ App icons in the UI and demo are original geometric monograms, not third-party a
 ## License
 
 MIT © 2026 DansiDanutz. See [LICENSE](LICENSE).
+
+### iPhone web preview
+
+In **Connect a phone → iPhone web preview**, choose your iPhone model, enter an HTTP(S) URL and select
+**Preview**. Each window uses an isolated WebKit session with the selected model’s
+viewport and touch settings. No connected device or Xcode is needed. This tests
+mobile web content, not Safari's address bar, native fullscreen or installed iOS apps.
+Install the matching WebKit engine from the source checkout once per version:
+
+    node node_modules/playwright-core/cli.js install webkit
